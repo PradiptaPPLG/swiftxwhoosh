@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -109,7 +110,35 @@ fun AddPassengerScreen(
                         HorizontalDivider(color = SwiftGrayLight)
 
                         // Date of birth
-                        ClickableRow("Date of birth", passenger.dateOfBirth.ifBlank { "Please select a date of birth" }, true)
+                        var showDatePicker by remember { mutableStateOf(false) }
+                        val datePickerState = rememberDatePickerState()
+
+                        if (showDatePicker) {
+                            DatePickerDialog(
+                                onDismissRequest = { showDatePicker = false },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        datePickerState.selectedDateMillis?.let { millis ->
+                                            val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(millis))
+                                            passenger = passenger.copy(dateOfBirth = date)
+                                        }
+                                        showDatePicker = false
+                                    }) { Text("OK", color = SwiftRed) }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                                }
+                            ) {
+                                DatePicker(state = datePickerState)
+                            }
+                        }
+
+                        ClickableRow(
+                            label = "Date of birth", 
+                            value = passenger.dateOfBirth.ifBlank { "Please select a date of birth" }, 
+                            isPlaceholder = passenger.dateOfBirth.isBlank(),
+                            onClick = { showDatePicker = true }
+                        )
 
                         // Passenger Type
                         ClickableRow("Passenger Type", passenger.passengerType.displayName, false) {

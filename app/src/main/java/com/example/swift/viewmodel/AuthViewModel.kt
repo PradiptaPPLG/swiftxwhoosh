@@ -1,12 +1,14 @@
 package com.example.swift.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.UserProfileChangeRequest
+import com.example.swift.api.AuthResponse
+import com.example.swift.api.RetrofitClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 sealed class AuthState {
     data object Idle : AuthState()
@@ -16,61 +18,80 @@ sealed class AuthState {
 }
 
 class AuthViewModel : ViewModel() {
-    private val auth = FirebaseAuth.getInstance()
-
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    val currentUser: FirebaseUser? get() = auth.currentUser
-    val isLoggedIn: Boolean get() = auth.currentUser != null
-    val userName: String get() = auth.currentUser?.displayName ?: auth.currentUser?.email?.substringBefore("@") ?: "User"
-    val userEmail: String get() = auth.currentUser?.email ?: ""
+    private var _isLoggedIn = MutableStateFlow(false)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+    
+    private var _userName = MutableStateFlow("")
+    val userName: StateFlow<String> = _userName.asStateFlow()
+    
+    private var _userEmail = MutableStateFlow("")
+    val userEmail: StateFlow<String> = _userEmail.asStateFlow()
+
+    private var _userId = MutableStateFlow<Int?>(null)
+    val userId: StateFlow<Int?> = _userId.asStateFlow()
 
     fun login(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {
-            _authState.value = AuthState.Error("Email dan kata sandi harus diisi")
+            _authState.value = AuthState.Error("Email and password are required")
             return
         }
         _authState.value = AuthState.Loading
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnSuccessListener {
-                _authState.value = AuthState.Success("Login berhasil!")
+        
+        RetrofitClient.instance.login(email, password).enqueue(object : Callback<AuthResponse> {
+            override fun onResponse(call: Call<AuthResponse>, response: Response<AuthResponse>) {
+                if (response.isSuccessful && response.body()?.status == "success") {
+                    val userData = response.body()?.user
+                    _isLoggedIn.value = true
+                    _userId.value = userData?.userId
+                    _userName.value = userData?.fullName ?: ""
+                    _userEmail.value = userData?.email ?: ""
+                    _authState.value = AuthState.Success("Login successful!")
+                } else {
+                    _authState.value = AuthState.Error(response.body()?.message ?: "Login failed")
+                }
             }
-            .addOnFailureListener { e ->
-                _authState.value = AuthState.Error(e.localizedMessage ?: "Login gagal")
+
+            override fun onFailure(call: Call<AuthResponse>, t: Throwable) {
+                _authState.value = AuthState.Error("Network error: ${t.localizedMessage}")
             }
+        })
     }
 
-    fun register(name: String, email: String, password: String, confirmPassword: String) {
-        if (name.isBlank() || email.isBlank() || password.isBlank()) {
-            _authState.value = AuthState.Error("Semua field harus diisi")
+    fun register(name: String, email: String, phone: String, password: String, confirmPassword: String) {
+        if (name.isBlank() || email.isBlank() || phone.isBlank() || password.isBlank()) {
+            _authState.value = AuthState.Error("All fields are required")
             return
         }
         if (password != confirmPassword) {
-            _authState.value = AuthState.Error("Kata sandi tidak cocok")
+            _authState.value = AuthState.Error("Passwords do not match")
             return
         }
         if (password.length < 8) {
-            _authState.value = AuthState.Error("Kata sandi minimal 8 karakter")
+            _authState.value = AuthState.Error("Password must be at least 8 characters")
             return
         }
         _authState.value = AuthState.Loading
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnSuccessListener { result ->
-                val profileUpdates = UserProfileChangeRequest.Builder()
-                    .setDisplayName(name)
-                    .build()
-                result.user?.updateProfile(profileUpdates)?.addOnCompleteListener {
-                    _authState.value = AuthState.Success("Registrasi berhasil!")
+        
+        RetrofitClient.instance.register(name, email, phone, password).enqueue(object : Callback<AuthResponse> {
+            override fun onResponse(call: Call<AuthResponse>, response: Response<AuthResponse>) {
+                if (response.isSuccessful && response.body()?.status == "success") {
+                    _authState.value = AuthState.Success("Registration successful! Please login.")
+                } else {
+                    _authState.value = AuthState.Error(response.body()?.message ?: "Registration failed")
                 }
             }
-            .addOnFailureListener { e ->
-                _authState.value = AuthState.Error(e.localizedMessage ?: "Registrasi gagal")
+
+            override fun onFailure(call: Call<AuthResponse>, t: Throwable) {
+                _authState.value = AuthState.Error("Network error: ${t.localizedMessage}")
             }
+        })
     }
 
     fun logout() {
-        auth.signOut()
+        _isLoggedIn.value = false
         _authState.value = AuthState.Idle
     }
 

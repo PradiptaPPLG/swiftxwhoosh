@@ -56,7 +56,7 @@ fun QRCodeDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Whoosh",
+                        text = "Swift",
                         color = SwiftRed,
                         fontWeight = FontWeight.ExtraBold,
                         fontStyle = FontStyle.Italic,

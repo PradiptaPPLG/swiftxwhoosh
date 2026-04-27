@@ -37,7 +37,8 @@ fun SeatSelectionScreen(
     val isLoading = bookingViewModel.isLoadingSeats
 
     LaunchedEffect(Unit) {
-        bookingViewModel.prepareSeatingAndFetch()
+        val scheduleId = bookingViewModel.schedules.find { it.departureTime.startsWith(bookingViewModel.selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
+        bookingViewModel.prepareSeatingAndFetch(scheduleId)
     }
 
     Scaffold(
@@ -133,7 +134,7 @@ fun SeatSelectionScreen(
                                 onClick = {
                                     if (coach.id != selectedCoachId) {
                                         bookingViewModel.selectedCoachId = coach.id
-                                        // Optional: Clear selection when changing coach. Wait, Whoosh might allow cross coach? Let's clear for simplicity
+                                        // Optional: Clear selection when changing coach. Wait, Swift might allow cross coach? Let's clear for simplicity
                                         if (bookingViewModel.selectedSeats.isNotEmpty()) {
                                             bookingViewModel.selectedSeats = emptyList()
                                         }
@@ -257,7 +258,7 @@ private fun CoachTab(coachId: String, isSelected: Boolean, onClick: () -> Unit) 
 
 @Composable
 private fun SeatIcon(seatId: String, isAvailable: Boolean, isSelected: Boolean, onClick: () -> Unit) {
-    val imageRes = if (isAvailable) com.example.swift.R.drawable.kursiwhoosh_available else com.example.swift.R.drawable.kursiwhoosh_unavailable
+    val imageRes = if (isAvailable) com.example.swift.R.drawable.kursiswift_available else com.example.swift.R.drawable.kursiswift_unavailable
     val textColor = if (isSelected) SwiftWhite else SwiftRed
 
     Box(

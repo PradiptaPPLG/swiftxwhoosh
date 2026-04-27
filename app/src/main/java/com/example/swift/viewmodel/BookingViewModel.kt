@@ -4,17 +4,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.swift.data.FirestoreRepository
 import com.example.swift.models.*
+import com.example.swift.models.OccupiedSeatsResponse
 import com.example.swift.utils.EmailSender
+import com.example.swift.api.RetrofitClient
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
 class BookingViewModel : ViewModel() {
-    private val firestoreRepo = FirestoreRepository()
+
+    private val apiService = RetrofitClient.instance
 
     var origin by mutableStateOf(Station.HALIM)
     var destination by mutableStateOf(Station.TEGALLUAR)
@@ -25,7 +29,7 @@ class BookingViewModel : ViewModel() {
     var selectedCoach by mutableStateOf<CoachClass?>(null)
     
     // Seat Booking State
-    val passengers = androidx.compose.runtime.mutableStateListOf(PassengerDetail())
+    val passengers = mutableStateListOf<PassengerDetail>()
     var coaches by mutableStateOf<List<Coach>>(emptyList())
     var selectedCoachId by mutableStateOf("01")
     var selectedSeats by mutableStateOf<List<String>>(emptyList())
@@ -36,12 +40,58 @@ class BookingViewModel : ViewModel() {
     var bookingComplete by mutableStateOf(false)
     var currentBooking by mutableStateOf<BookingData?>(null)
 
+    // Saved Passengers
+    var savedPassengers by mutableStateOf<List<PassengerDetail>>(emptyList())
+    var isLoadingSavedPassengers by mutableStateOf(false)
+
+    // Real API State
+    var schedules by mutableStateOf<List<com.example.swift.api.TrainSchedule>>(emptyList())
+    var isLoadingSchedules by mutableStateOf(false)
+
+    fun fetchSchedules() {
+        isLoadingSchedules = true
+        apiService.getSchedules(origin.displayName, destination.displayName)
+            .enqueue(object : retrofit2.Callback<List<com.example.swift.api.TrainSchedule>> {
+                override fun onResponse(
+                    call: retrofit2.Call<List<com.example.swift.api.TrainSchedule>>,
+                    response: retrofit2.Response<List<com.example.swift.api.TrainSchedule>>
+                ) {
+                    isLoadingSchedules = false
+                    if (response.isSuccessful) {
+                        schedules = response.body() ?: emptyList()
+                    }
+                }
+
+                override fun onFailure(call: retrofit2.Call<List<com.example.swift.api.TrainSchedule>>, t: Throwable) {
+                    isLoadingSchedules = false
+                    bookingErrorMessage = t.message
+                }
+            })
+    }
+
+    fun fetchSavedPassengers(userId: Int) {
+        isLoadingSavedPassengers = true
+        viewModelScope.launch {
+            try {
+                val response = apiService.getSavedPassengers(userId).execute().body()
+                if (response?.status == "success") {
+                    savedPassengers = response.data
+                }
+            } catch (e: Exception) {
+                // Handle error
+            } finally {
+                isLoadingSavedPassengers = false
+            }
+        }
+    }
+
     val travelDuration: Int get() = TravelTime.getDuration(origin, destination)
 
+    var selectedArrivalTime: String = ""
+
     val arrivalTime: String
-        get() = selectedTime?.let {
-            DepartureSchedule.calculateArrival(it, travelDuration)
-        } ?: ""
+        get() = if (selectedArrivalTime.isNotEmpty()) selectedArrivalTime 
+                else selectedTime?.let { DepartureSchedule.calculateArrival(it, travelDuration) } ?: ""
 
     val pricePerTicket: Int
         get() = selectedCoach?.let {
@@ -102,8 +152,6 @@ class BookingViewModel : ViewModel() {
             if (current.size < ticketCount) {
                 current.add(seatId)
             } else {
-                // If it's already full, replace the last clicked one? Or do nothing. 
-                // Alternatively, pop the first one and add new one.
                 current.removeAt(0)
                 current.add(seatId)
             }
@@ -111,48 +159,66 @@ class BookingViewModel : ViewModel() {
         selectedSeats = current
     }
 
+    fun togglePassengerSelection(passenger: PassengerDetail, userId: Int) {
+        val existing = passengers.find { it.identityNumber == passenger.identityNumber }
+        if (existing != null) {
+            passengers.remove(existing)
+        } else {
+            if (passengers.size < 15) {
+                passengers.add(passenger)
+            }
+        }
+    }
+
+    fun prepareSeatingAndFetch(scheduleId: Int) {
+        isLoadingSeats = true
+        viewModelScope.launch {
+            try {
+                val response = apiService.getSeats(scheduleId, selectedCoachId).execute().body()
+                val occupied = response?.occupiedSeats ?: emptyList<String>()
+                
+                val seatLetters = listOf("A", "B", "C", "D", "F")
+                val mockCoaches = (1..2).map { coachNum ->
+                    val coachId = String.format("%02d", coachNum)
+                    val seats = (1..13).flatMap { row ->
+                        seatLetters.map { letter ->
+                            val seatId = "$row$letter"
+                            Seat(seatId, isAvailable = !occupied.contains(seatId))
+                        }
+                    }
+                    Coach(coachId, seats)
+                }
+                coaches = mockCoaches
+                if (selectedCoachId.isEmpty() && coaches.isNotEmpty()) {
+                    selectedCoachId = coaches.first().id
+                }
+            } catch (e: Exception) {
+                // Handle error
+            } finally {
+                isLoadingSeats = false
+            }
+        }
+    }
+
     private fun generateBookingCode(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         return "SWF-" + (1..8).map { chars.random() }.joinToString("")
     }
 
-    // Prepare Firestore Data for seating selection
-    fun prepareSeatingAndFetch() {
-        val time = selectedTime ?: return
-        if (departureDate.isEmpty()) return
-        
-        val scheduleId = firestoreRepo.getScheduleId(origin, destination, departureDate, time)
-        isLoadingSeats = true
-        
-        viewModelScope.launch {
-            firestoreRepo.checkAndSeedData(scheduleId) {
-                // After checking/seeding, start listening
-                firestoreRepo.getCoachesFlow(scheduleId) { updatedCoaches ->
-                    coaches = updatedCoaches
-                    isLoadingSeats = false
-                }
-            }
-        }
-    }
-
-    fun processFinalBooking() {
+    fun processFinalBooking(userId: Int) {
         val isPassengersValid = passengers.all { it.name.isNotBlank() && it.identityNumber.isNotBlank() }
-        val isFirstPassengerEmailValid = passengers.firstOrNull()?.email?.isNotBlank() == true
-
-        if (selectedSeats.size != ticketCount || !isPassengersValid || !isFirstPassengerEmailValid) {
-            bookingErrorMessage = "Please complete all passenger details and contact email."
+        if (passengers.isEmpty() || passengers.size != ticketCount || !isPassengersValid) {
+            bookingErrorMessage = "Please complete all passenger details."
             return
         }
-        
-        val time = selectedTime ?: return
-        val scheduleId = firestoreRepo.getScheduleId(origin, destination, departureDate, time)
-        
+
         isProcessingBooking = true
         bookingErrorMessage = null
-        
+
         viewModelScope.launch {
-            val success = firestoreRepo.bookSeatsTransaction(scheduleId, selectedCoachId, selectedSeats)
-            if (success) {
+            try {
+                // Note: Real API call for saving passengers would go here
+                delay(1000)
                 val code = generateBookingCode()
                 val completeBk = BookingData(
                     bookingCode = code,
@@ -163,7 +229,7 @@ class BookingViewModel : ViewModel() {
                     destination = destination,
                     ticketCount = ticketCount,
                     departureDate = departureDate,
-                    departureTime = time,
+                    departureTime = selectedTime ?: "00:00",
                     arrivalTime = arrivalTime,
                     travelDuration = travelDuration,
                     coachClass = selectedCoach ?: CoachClass.PREMIUM_ECONOMY,
@@ -174,13 +240,21 @@ class BookingViewModel : ViewModel() {
                 )
                 currentBooking = completeBk
                 bookingComplete = true
-                isProcessingBooking = false
-
-                // Try to send email automatically in background thread
+                
+                // Mark seats as occupied in DB
+                val scheduleId = schedules.find { it.departureTime.startsWith(selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
+                val seatReq = mapOf(
+                    "schedule_id" to scheduleId,
+                    "coach_id" to selectedCoachId,
+                    "seats" to selectedSeats
+                )
+                apiService.bookSeats(seatReq).execute()
+                
                 EmailSender.sendTicketEmail(completeBk, formatCurrency(totalPrice))
-            } else {
+            } catch (e: Exception) {
+                bookingErrorMessage = "Booking failed: ${e.message}"
+            } finally {
                 isProcessingBooking = false
-                bookingErrorMessage = "Sorry, one or more selected seats have been booked. Please select other seats."
             }
         }
     }

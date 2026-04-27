@@ -113,9 +113,9 @@ fun CoachSelectionScreen(
                 val isSelected = bookingViewModel.selectedCoach == coach
 
                 val (gradientColor, iconColor) = when (coach) {
-                    CoachClass.EKONOMI -> Pair(SwiftTeal, SwiftDarkTeal)
-                    CoachClass.BISNIS -> Pair(SwiftDarkTeal, SwiftWhite)
-                    CoachClass.VIP -> Pair(SwiftGold, SwiftBlack)
+                    CoachClass.PREMIUM_ECONOMY -> Pair(SwiftTeal, SwiftDarkTeal)
+                    CoachClass.BUSINESS -> Pair(SwiftDarkTeal, SwiftWhite)
+                    CoachClass.FIRST -> Pair(SwiftGold, SwiftBlack)
                 }
 
                 Card(
@@ -150,9 +150,9 @@ fun CoachSelectionScreen(
                         ) {
                             Icon(
                                 imageVector = when (coach) {
-                                    CoachClass.EKONOMI -> Icons.Default.AirlineSeatReclineNormal
-                                    CoachClass.BISNIS -> Icons.Default.AirlineSeatReclineExtra
-                                    CoachClass.VIP -> Icons.Default.Star
+                                    CoachClass.PREMIUM_ECONOMY -> Icons.Default.AirlineSeatReclineNormal
+                                    CoachClass.BUSINESS -> Icons.Default.AirlineSeatReclineExtra
+                                    CoachClass.FIRST -> Icons.Default.Star
                                 },
                                 contentDescription = null,
                                 tint = gradientColor,

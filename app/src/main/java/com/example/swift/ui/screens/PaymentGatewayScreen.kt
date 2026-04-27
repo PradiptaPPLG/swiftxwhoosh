@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -123,7 +124,9 @@ fun PaymentGatewayScreen(
                         Text("Virtual Account", color = SwiftDarkTeal, fontWeight = FontWeight.Bold)
                     }
                     
+                    val bankColors = listOf(SwiftDarkTeal, Color(0xFFE96D1D), Color(0xFF00529C), Color(0xFF1B4E9B))
                     val banks = listOf("Bank Mandiri", "Bank BNI", "Bank BRI", "Bank BTN")
+                    
                     banks.forEachIndexed { index, bank ->
                         Row(
                             modifier = Modifier
@@ -132,8 +135,21 @@ fun PaymentGatewayScreen(
                                 .padding(horizontal = 16.dp, vertical = 20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Placeholder for bank logo
-                            Box(modifier = Modifier.size(32.dp).background(SwiftGrayLight, RoundedCornerShape(4.dp)))
+                            // Stylized Bank Logo Placeholder
+                            Surface(
+                                color = bankColors[index],
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.size(width = 44.dp, height = 28.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        bank.split(" ").last(), 
+                                        color = SwiftWhite, 
+                                        fontSize = 8.sp, 
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.width(16.dp))
                             Text(bank, fontSize = 16.sp, color = SwiftBlack, fontWeight = FontWeight.Medium)
                         }

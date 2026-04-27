@@ -90,38 +90,38 @@ fun PaymentSummaryScreen(
                         Text(bookingViewModel.formatCurrency(bookingViewModel.totalPrice), color = SwiftRed, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, bottom = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         OutlinedButton(
                             onClick = onBack,
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier.weight(0.8f).height(48.dp),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftGray),
                             border = androidx.compose.foundation.BorderStroke(1.dp, SwiftGrayLight)
                         ) {
-                            Text("Cancel")
+                            Text("Cancel", fontSize = 12.sp)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         OutlinedButton(
                             onClick = { },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier.weight(0.8f).height(48.dp),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftGray),
                             border = androidx.compose.foundation.BorderStroke(1.dp, SwiftGrayLight)
                         ) {
-                            Text("Return Trip")
+                            Text("Return", fontSize = 12.sp)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            onClick = { bookingViewModel.processFinalBooking() },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            onClick = { bookingViewModel.processFinalBooking(authViewModel.userId.value ?: 0) },
+                            modifier = Modifier.weight(1.4f).height(48.dp),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = SwiftRed),
                             enabled = !isProcessing
                         ) {
                             if (isProcessing) {
-                                CircularProgressIndicator(color = SwiftWhite, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(color = SwiftWhite, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
                                 Text("Pay", fontWeight = FontWeight.Bold)
                             }
@@ -206,15 +206,37 @@ fun PaymentSummaryScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Passenger", fontSize = 16.sp, color = SwiftBlack)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(passenger.name.ifBlank { "New Passenger" }, fontSize = 16.sp, color = SwiftBlack)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(color = SwiftGrayLight, shape = RoundedCornerShape(4.dp)) {
-                                    Text("${passenger.passengerType.displayName} ticket", fontSize = 10.sp, color = SwiftGrayMedium, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = passenger.name.ifBlank { "New Passenger" },
+                                    fontSize = 16.sp,
+                                    color = SwiftBlack,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Surface(
+                                    color = SwiftGrayLight.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = "${passenger.passengerType.displayName} ticket",
+                                        fontSize = 10.sp,
+                                        color = SwiftGrayMedium,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
                                 }
                             }
-                            Text(bookingViewModel.formatCurrency(bookingViewModel.pricePerTicket), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SwiftBlack)
+                            Text(
+                                text = bookingViewModel.formatCurrency(bookingViewModel.pricePerTicket),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SwiftBlack
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         val hiddenId = if (passenger.identityNumber.length > 4) {

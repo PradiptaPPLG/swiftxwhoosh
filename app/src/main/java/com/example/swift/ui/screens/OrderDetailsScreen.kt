@@ -151,11 +151,24 @@ fun OrderDetailsScreen(
                         Column {
                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(passenger.name, fontSize = 16.sp, color = SwiftBlack)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Surface(color = SwiftGrayLight, shape = RoundedCornerShape(4.dp)) {
-                                            Text("${passenger.passengerType.displayName} ticket", fontSize = 10.sp, color = SwiftGrayMedium, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                    Column {
+                                        Text(
+                                            text = passenger.name,
+                                            fontSize = 16.sp,
+                                            color = SwiftBlack,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Surface(
+                                            color = SwiftGrayLight.copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "${passenger.passengerType.displayName} ticket",
+                                                fontSize = 10.sp,
+                                                color = SwiftGrayMedium,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -187,7 +200,7 @@ fun OrderDetailsScreen(
                             
                             OutlinedButton(
                                 onClick = { },
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, bottom = 16.dp).height(48.dp),
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).height(48.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftBlack),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, SwiftGrayLight)

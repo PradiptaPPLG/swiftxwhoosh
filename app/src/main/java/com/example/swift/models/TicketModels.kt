@@ -1,5 +1,7 @@
 package com.example.swift.models
 
+import com.google.gson.annotations.SerializedName
+
 enum class Station(val displayName: String) {
     TEGALLUAR("Tegalluar"),
     PADALARANG("Padalarang"),
@@ -25,18 +27,26 @@ data class BookingData(
     val departureTime: String = "",
     val arrivalTime: String = "",
     val travelDuration: Int = 0,
-    val coachClass: CoachClass = CoachClass.EKONOMI,
+    val coachClass: CoachClass = CoachClass.PREMIUM_ECONOMY,
     val selectedCoachId: String = "",
     val selectedSeats: List<String> = emptyList(),
     val pricePerTicket: Int = 0,
     val totalPrice: Int = 0
 )
 object TicketPricing {
-    fun getPrice(coach: CoachClass): Int {
-        return when (coach) {
+    fun getPrice(coach: CoachClass, ticketCount: Int = 1): Int {
+        val basePrice = when (coach) {
             CoachClass.PREMIUM_ECONOMY -> 250_000
             CoachClass.BUSINESS -> 450_000
             CoachClass.FIRST -> 600_000
+        }
+        
+        // Dynamic pricing based on ticket count
+        return when {
+            ticketCount >= 9 -> (basePrice * 0.85).toInt() // 15% discount
+            ticketCount >= 6 -> (basePrice * 0.90).toInt() // 10% discount
+            ticketCount >= 3 -> (basePrice * 0.95).toInt() // 5% discount
+            else -> basePrice
         }
     }
 }
@@ -71,13 +81,20 @@ object DepartureSchedule {
     }
 
     fun calculateArrival(departureTime: String, durationMinutes: Int): String {
-        val parts = departureTime.split(":")
-        val depHour = parts[0].toInt()
-        val depMin = parts[1].toInt()
-        val totalMin = depHour * 60 + depMin + durationMinutes
-        val arrHour = (totalMin / 60) % 24
-        val arrMin = totalMin % 60
-        return "%02d:%02d".format(arrHour, arrMin)
+        return try {
+            val parts = departureTime.split(":")
+            if (parts.size < 2) return departureTime
+            val depHour = parts[0].toInt()
+            val depMin = parts[1].toInt()
+
+            var totalMinutes = depHour * 60 + depMin + durationMinutes
+            val arrivalHour = (totalMinutes / 60) % 24
+            val arrivalMin = totalMinutes % 60
+
+            String.format("%02d:%02d", arrivalHour, arrivalMin)
+        } catch (e: Exception) {
+            departureTime
+        }
     }
 }
 
@@ -124,4 +141,14 @@ data class ScheduleDocument(
     val routeId: String = "",
     val departureDate: String = "",
     val departureTime: String = ""
+)
+
+data class SavedPassengersResponse(
+    val status: String,
+    val data: List<PassengerDetail>
+)
+
+data class OccupiedSeatsResponse(
+    val status: String,
+    @SerializedName("occupied_seats") val occupiedSeats: List<String>
 )

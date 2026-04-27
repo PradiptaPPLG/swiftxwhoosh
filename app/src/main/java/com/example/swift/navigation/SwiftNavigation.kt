@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +55,8 @@ fun SwiftNavigation() {
     val authViewModel: AuthViewModel = viewModel()
     val bookingViewModel: BookingViewModel = viewModel()
 
+    val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
+
     NavHost(
         navController = navController, 
         startDestination = Screen.Splash.route,
@@ -94,7 +97,7 @@ fun SwiftNavigation() {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
                 },
-                isLoggedIn = authViewModel.isLoggedIn
+                isLoggedIn = isLoggedIn
             )
         }
 
@@ -174,6 +177,7 @@ fun SwiftNavigation() {
         composable(Screen.PassengerDetails.route) {
             PassengerDetailsScreen(
                 bookingViewModel = bookingViewModel,
+                authViewModel = authViewModel,
                 onNextClicked = {
                     navController.navigate(Screen.SeatSelection.route)
                 },

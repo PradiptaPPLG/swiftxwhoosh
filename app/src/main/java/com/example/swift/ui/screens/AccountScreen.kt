@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +26,8 @@ fun AccountScreen(
     onLogout: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+
+    val userName by authViewModel.userName.collectAsState()
 
     Column(
         modifier = Modifier
@@ -65,7 +68,7 @@ fun AccountScreen(
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(
-                    authViewModel.userName.ifBlank { "KikiSupendiMT" },
+                    userName.ifBlank { "User" },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = SwiftBlack
@@ -109,7 +112,7 @@ fun AccountScreen(
                 ) {
                     AccountGridItem(Icons.Default.Email, "E-mail")
                     AccountGridItem(Icons.Default.Notifications, "Message\nNotifications")
-                    AccountGridItem(Icons.Default.WhatsApp, "WhatsApp")
+                    AccountGridItem(Icons.Default.Phone, "Call Center")
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(

@@ -1,30 +1,35 @@
 package com.example.swift.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Contacts
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.swift.models.IdentityType
 import com.example.swift.models.PassengerDetail
 import com.example.swift.models.PassengerType
+import com.example.swift.models.CoachClass
 import com.example.swift.ui.theme.*
+import com.example.swift.viewmodel.AuthViewModel
 import com.example.swift.viewmodel.BookingViewModel
 import kotlinx.coroutines.launch
 
@@ -32,108 +37,185 @@ import kotlinx.coroutines.launch
 @Composable
 fun PassengerDetailsScreen(
     bookingViewModel: BookingViewModel,
+    authViewModel: AuthViewModel,
     onNextClicked: () -> Unit,
     onAddPassengerClicked: () -> Unit,
     onBack: () -> Unit
 ) {
-    val passengers = bookingViewModel.passengers
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val savedPassengers = bookingViewModel.savedPassengers
+    val currentSelected = bookingViewModel.passengers
+    val userId = authViewModel.userId.collectAsState().value ?: 0
+
+    LaunchedEffect(Unit) {
+        bookingViewModel.fetchSavedPassengers(userId)
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Passenger", fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center) },
+                title = { Text("Book", fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                actions = {
-                    TextButton(onClick = {
-                        val allValid = passengers.all { it.name.isNotBlank() && it.identityNumber.isNotBlank() }
-                        if (allValid && passengers.isNotEmpty()) {
-                            onNextClicked()
-                        } else {
-                            coroutineScope.launch { snackbarHostState.showSnackbar("Please add at least 1 valid passenger") }
-                        }
-                    }) {
-                        Text("Done", color = SwiftRed, fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SwiftWhite,
-                    titleContentColor = SwiftBlack,
-                    navigationIconContentColor = SwiftBlack
+                    containerColor = SwiftRed,
+                    titleContentColor = SwiftWhite,
+                    navigationIconContentColor = SwiftWhite
                 )
             )
+        },
+        bottomBar = {
+            Column(modifier = Modifier.background(SwiftWhite).padding(16.dp)) {
+                Button(
+                    onClick = { /* Navigate to seat selection */ },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333))
+                ) {
+                    Text("Select seat", color = SwiftWhite)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (currentSelected.isNotEmpty()) {
+                            onNextClicked()
+                        } else {
+                            coroutineScope.launch { snackbarHostState.showSnackbar("Please select at least 1 passenger") }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SwiftRed)
+                ) {
+                    Text("Next step", color = SwiftWhite)
+                }
+            }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(SwiftWhite)
+                .background(Color(0xFFF5F6F8))
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
         ) {
-            // Header Info
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SwiftRed.copy(alpha = 0.05f))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            // Schedule Summary Card (Photo 4 Top)
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = SwiftWhite)
             ) {
-                Text(
-                    text = "${passengers.size}/15 ( Up to 15 passengers can be added)",
-                    color = SwiftGrayMedium,
-                    fontSize = 14.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Add Passenger Button
-            OutlinedButton(
-                onClick = {
-                    if (passengers.size < 15) {
-                        onAddPassengerClicked()
-                    } else {
-                        coroutineScope.launch { snackbarHostState.showSnackbar("Maximum 15 passengers reached") }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .height(50.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftRed),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SwiftRed.copy(alpha = 0.5f))
-            ) {
-                Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Passenger", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Passenger List
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                itemsIndexed(passengers) { index, passenger ->
-                    PassengerListItem(
-                        passenger = passenger,
-                        onEdit = {
-                            // Currently, clicking edit might just navigate or could set an active passenger index.
-                            // For simplicity, we can let users edit by removing and re-adding or we'll need to pass index.
-                            // We can just show a snackbar for now or navigate to AddPassengerScreen with context.
-                            coroutineScope.launch { snackbarHostState.showSnackbar("Edit feature coming soon") }
-                        },
-                        onRemove = {
-                            bookingViewModel.removePassenger(index)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(bookingViewModel.departureDate, color = SwiftGray, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(bookingViewModel.selectedTime ?: "", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SwiftBlack)
+                            Text(bookingViewModel.origin.displayName, fontSize = 14.sp, color = SwiftGray)
                         }
-                    )
-                    HorizontalDivider(color = SwiftGrayLight, modifier = Modifier.padding(start = 56.dp))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("G1057", color = SwiftGray, fontSize = 12.sp)
+                            Icon(Icons.Default.ArrowForward, contentDescription = null, tint = SwiftGrayLight, modifier = Modifier.size(24.dp))
+                            Text("${bookingViewModel.travelDuration} m", color = SwiftGray, fontSize = 12.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(bookingViewModel.selectedArrivalTime ?: "", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SwiftBlack)
+                            Text(bookingViewModel.destination.displayName, fontSize = 14.sp, color = SwiftGray)
+                        }
+                    }
+                }
+            }
+
+            // Class Cards (Photo 4 Middle)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ClassMiniCard("First Class", 600000, bookingViewModel.selectedCoach == CoachClass.FIRST, Modifier.weight(1f)) {
+                    bookingViewModel.selectedCoach = CoachClass.FIRST
+                }
+                ClassMiniCard("Business Class", 450000, bookingViewModel.selectedCoach == CoachClass.BUSINESS, Modifier.weight(1f)) {
+                    bookingViewModel.selectedCoach = CoachClass.BUSINESS
+                }
+                ClassMiniCard("Premium Economy Class", 250000, bookingViewModel.selectedCoach == CoachClass.PREMIUM_ECONOMY, Modifier.weight(1f)) {
+                    bookingViewModel.selectedCoach = CoachClass.PREMIUM_ECONOMY
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Passenger Selection Section (Photo 4 Bottom)
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = SwiftWhite,
+                border = androidx.compose.foundation.BorderStroke(1.dp, SwiftGrayLight.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Passenger", fontSize = 18.sp, fontWeight = FontWeight.Medium, color = SwiftBlack)
+                        if (currentSelected.isNotEmpty()) {
+                             Text(currentSelected.firstOrNull()?.name ?: "", color = SwiftGray, fontSize = 14.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onAddPassengerClicked,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = SwiftWhite),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SwiftRed),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text("Select Passenger", color = SwiftRed)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Conditions Text
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text("Ticket Detection & Cancel Condition", fontWeight = FontWeight.Bold, color = SwiftBlack)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("1. BA baby under three", fontSize = 12.sp, color = SwiftGray)
+                Text("2. Adults 17 years of age or older", fontSize = 12.sp, color = SwiftGray)
+                Text("3. The name and identity number must be in accordance with that contained in the identity certificate (KTP/ Passport), when the passenger age below 17 years can be filled in with the date of birth of", fontSize = 12.sp, color = SwiftGray)
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun ClassMiniCard(name: String, price: Int, isSelected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Surface(
+        modifier = modifier.clickable { onClick() },
+        shape = RoundedCornerShape(8.dp),
+        color = if (isSelected) SwiftWhite else Color(0xFFF0F0F0),
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, SwiftRed) else null,
+        shadowElevation = if (isSelected) 4.dp else 0.dp
+    ) {
+        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.Start) {
+            Text("Rp.${String.format("%,d", price).replace(",", ".")}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (isSelected) SwiftRed else SwiftGray)
+            Text(name, fontSize = 10.sp, color = SwiftGray)
+            Text("Available", fontSize = 10.sp, color = SwiftGray)
+            if (isSelected) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomEnd) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SwiftRed, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -143,29 +225,36 @@ fun PassengerDetailsScreen(
 @Composable
 fun PassengerListItem(
     passenger: PassengerDetail,
-    onEdit: () -> Unit,
-    onRemove: () -> Unit
+    isSelected: Boolean,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onToggle() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Red Checkbox
+        // Selection Checkbox
         Box(
             modifier = Modifier
                 .size(24.dp)
-                .background(SwiftRed, RoundedCornerShape(4.dp))
-                .clickable { onRemove() }, // Clicking the checkbox removes them for now
+                .background(
+                    if (isSelected) SwiftRed else Color.Transparent, 
+                    RoundedCornerShape(4.dp)
+                )
+                .border(1.dp, if (isSelected) SwiftRed else SwiftGrayLight, RoundedCornerShape(4.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Check,
-                contentDescription = "Selected",
-                tint = SwiftWhite,
-                modifier = Modifier.size(16.dp)
-            )
+            if (isSelected) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.Check,
+                    contentDescription = "Selected",
+                    tint = SwiftWhite,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(16.dp))
