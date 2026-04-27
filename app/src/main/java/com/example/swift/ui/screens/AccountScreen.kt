@@ -65,15 +65,10 @@ fun AccountScreen(
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(
-                    authViewModel.userName,
+                    authViewModel.userName.ifBlank { "KikiSupendiMT" },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = SwiftBlack
-                )
-                Text(
-                    authViewModel.userEmail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = SwiftGray
                 )
             }
         }
@@ -85,13 +80,13 @@ fun AccountScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = SwiftWhite),
-            elevation = CardDefaults.cardElevation(2.dp)
+            elevation = CardDefaults.cardElevation(1.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Informasi Akun",
+                    "Common Functions",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = SwiftBlack
@@ -103,9 +98,9 @@ fun AccountScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    AccountGridItem(Icons.Default.People, "Daftar\nPenumpang")
-                    AccountGridItem(Icons.Default.Language, "Bahasa")
-                    AccountGridItem(Icons.Default.Lock, "Kata Sandi")
+                    AccountGridItem(Icons.Default.Badge, "Passenger")
+                    AccountGridItem(Icons.Default.GTranslate, "Language")
+                    AccountGridItem(Icons.Default.Lock, "Password")
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
@@ -113,8 +108,15 @@ fun AccountScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     AccountGridItem(Icons.Default.Email, "E-mail")
-                    AccountGridItem(Icons.Default.Notifications, "Notifikasi\npesan")
-                    AccountGridItem(Icons.Default.Phone, "WhatsApp")
+                    AccountGridItem(Icons.Default.Notifications, "Message\nNotifications")
+                    AccountGridItem(Icons.Default.WhatsApp, "WhatsApp")
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    AccountGridItem(Icons.Default.CreditCard, "Refund\nAccount")
                 }
             }
         }
@@ -126,46 +128,39 @@ fun AccountScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = SwiftWhite),
-            elevation = CardDefaults.cardElevation(2.dp)
+            elevation = CardDefaults.cardElevation(1.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Informasi Layanan",
+                    "Service Information",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = SwiftBlack
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                MenuItemRow(Icons.Default.Campaign, "Informasi Penting")
-                HorizontalDivider(color = SwiftGrayLight)
-                MenuItemRow(Icons.Default.Description, "Ketentuan Layanan")
-                HorizontalDivider(color = SwiftGrayLight)
-                MenuItemRow(Icons.Default.Info, "Tentang Aplikasi", trailing = "Versi V1.0.0")
+                MenuItemRow(Icons.Default.VolumeUp, "Notice")
+                HorizontalDivider(color = SwiftGrayLight, modifier = Modifier.padding(start = 32.dp))
+                MenuItemRow(Icons.Default.Assignment, "Railway regulations")
+                HorizontalDivider(color = SwiftGrayLight, modifier = Modifier.padding(start = 32.dp))
+                MenuItemRow(Icons.Default.Info, "About", trailing = "Version V1.2.002")
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         // Logout Button
-        Button(
+        TextButton(
             onClick = { showLogoutDialog = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = SwiftWhite,
-                contentColor = SwiftRed
-            ),
-            elevation = ButtonDefaults.buttonElevation(2.dp)
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Keluar", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text("Log Out", fontSize = 18.sp, color = SwiftRed, fontWeight = FontWeight.Normal)
         }
 
         Spacer(modifier = Modifier.height(40.dp))
@@ -175,20 +170,20 @@ fun AccountScreen(
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Keluar", fontWeight = FontWeight.Bold) },
-            text = { Text("Apakah Anda yakin ingin keluar dari akun?") },
+            title = { Text("Log Out", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to log out?") },
             confirmButton = {
                 TextButton(onClick = {
                     showLogoutDialog = false
                     authViewModel.logout()
                     onLogout()
                 }) {
-                    Text("Ya, Keluar", color = SwiftRed, fontWeight = FontWeight.SemiBold)
+                    Text("Yes, Log Out", color = SwiftRed, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("Batal", color = SwiftGray)
+                    Text("Cancel", color = SwiftGray)
                 }
             },
             containerColor = SwiftWhite
@@ -209,11 +204,10 @@ private fun AccountGridItem(
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .background(SwiftPinkBg, RoundedCornerShape(12.dp)),
+                .size(44.dp),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = SwiftDarkTeal, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = null, tint = SwiftRed, modifier = Modifier.size(28.dp))
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -240,7 +234,7 @@ private fun MenuItemRow(
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = SwiftDarkTeal, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = null, tint = SwiftBlack, modifier = Modifier.size(22.dp))
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             title,

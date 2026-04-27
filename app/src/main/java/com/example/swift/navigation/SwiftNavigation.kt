@@ -30,8 +30,12 @@ sealed class Screen(val route: String) {
     data object Schedule : Screen("schedule")
     data object CoachSelection : Screen("coach_selection")
     data object PassengerDetails : Screen("passenger_details")
+    data object AddPassenger : Screen("add_passenger")
     data object SeatSelection : Screen("seat_selection")
     data object PaymentSummary : Screen("payment_summary")
+    data object PaymentGateway : Screen("payment_gateway")
+    data object PaymentSucceeded : Screen("payment_succeeded")
+    data object OrderDetails : Screen("order_details")
     data object TicketReceipt : Screen("ticket_receipt")
     data object RefundPolicy : Screen("refund_policy")
     data object ScheduleInfo : Screen("schedule_info")
@@ -39,9 +43,9 @@ sealed class Screen(val route: String) {
 }
 
 sealed class BottomTab(val route: String, val label: String) {
-    data object Home : BottomTab("tab_home", "Halaman Utama")
-    data object Inbox : BottomTab("tab_inbox", "Kotak Masuk")
-    data object Account : BottomTab("tab_account", "Akun")
+    data object Home : BottomTab("tab_home", "Home")
+    data object MyTickets : BottomTab("tab_mytickets", "My Tickets")
+    data object Account : BottomTab("tab_account", "Account")
 }
 
 @Composable
@@ -136,6 +140,9 @@ fun SwiftNavigation() {
                 onAnnouncementClick = {
                     navController.navigate(Screen.Announcement.route)
                 },
+                onTicketClick = {
+                    navController.navigate(Screen.OrderDetails.route)
+                },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
@@ -170,6 +177,17 @@ fun SwiftNavigation() {
                 onNextClicked = {
                     navController.navigate(Screen.SeatSelection.route)
                 },
+                onAddPassengerClicked = {
+                    navController.navigate(Screen.AddPassenger.route)
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.AddPassenger.route) {
+            AddPassengerScreen(
+                bookingViewModel = bookingViewModel,
+                onSave = { navController.popBackStack() },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -189,10 +207,41 @@ fun SwiftNavigation() {
                 bookingViewModel = bookingViewModel,
                 authViewModel = authViewModel,
                 onPaymentComplete = {
-                    navController.navigate(Screen.TicketReceipt.route) {
+                    navController.navigate(Screen.PaymentGateway.route)
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.PaymentGateway.route) {
+            PaymentGatewayScreen(
+                bookingViewModel = bookingViewModel,
+                onPaymentSuccess = {
+                    navController.navigate(Screen.PaymentSucceeded.route) {
                         popUpTo(Screen.Main.route)
                     }
                 },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.PaymentSucceeded.route) {
+            OrderDetailsScreen(
+                bookingViewModel = bookingViewModel,
+                title = "Payment Succeeded",
+                onBack = {
+                    navController.navigate(Screen.Main.route) {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(Screen.OrderDetails.route) {
+            OrderDetailsScreen(
+                bookingViewModel = bookingViewModel,
+                title = "Order Details",
                 onBack = { navController.popBackStack() }
             )
         }
@@ -237,10 +286,11 @@ fun MainScreenWithBottomNav(
     onRefundPolicyClick: () -> Unit,
     onScheduleInfoClick: () -> Unit,
     onAnnouncementClick: () -> Unit,
+    onTicketClick: () -> Unit,
     onLogout: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf(BottomTab.Home, BottomTab.Inbox, BottomTab.Account)
+    val tabs = listOf(BottomTab.Home, BottomTab.MyTickets, BottomTab.Account)
 
     Scaffold(
         bottomBar = {
@@ -256,7 +306,7 @@ fun MainScreenWithBottomNav(
                             Icon(
                                 imageVector = when (index) {
                                     0 -> if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home
-                                    1 -> if (selectedTab == 1) Icons.Filled.Inbox else Icons.Outlined.Inbox
+                                    1 -> if (selectedTab == 1) Icons.Filled.Assignment else Icons.Outlined.Assignment
                                     else -> if (selectedTab == 2) Icons.Filled.AccountCircle else Icons.Outlined.AccountCircle
                                 },
                                 contentDescription = tab.label
@@ -290,7 +340,7 @@ fun MainScreenWithBottomNav(
                     onScheduleInfoClick = onScheduleInfoClick,
                     onAnnouncementClick = onAnnouncementClick
                 )
-                1 -> InboxPlaceholder()
+                1 -> MyTicketsScreen(onTicketClick = onTicketClick)
                 2 -> AccountScreen(
                     authViewModel = authViewModel,
                     onLogout = onLogout
@@ -300,30 +350,4 @@ fun MainScreenWithBottomNav(
     }
 }
 
-@Composable
-private fun InboxPlaceholder() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                Icons.Default.Inbox,
-                contentDescription = null,
-                tint = SwiftGrayMedium,
-                modifier = Modifier.size(64.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Belum ada pesan",
-                style = MaterialTheme.typography.titleMedium,
-                color = SwiftGray
-            )
-            Text(
-                "Pesan dan notifikasi akan muncul di sini",
-                style = MaterialTheme.typography.bodySmall,
-                color = SwiftGrayMedium
-            )
-        }
-    }
-}
+

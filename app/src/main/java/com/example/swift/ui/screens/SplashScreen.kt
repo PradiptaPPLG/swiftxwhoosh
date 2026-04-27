@@ -225,7 +225,7 @@ fun SplashScreen(onNavigateToLogin: () -> Unit, onNavigateToDashboard: () -> Uni
 
             // Tagline
             Text(
-                text = "Kereta Cepat Indonesia",
+                text = "High-Speed Railway",
                 color = SwiftWhite.copy(alpha = 0.75f),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,

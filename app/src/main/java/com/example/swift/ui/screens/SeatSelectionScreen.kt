@@ -43,7 +43,7 @@ fun SeatSelectionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pilih kereta & tempat duduk", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) },
+                title = { Text("Select carriage seat", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -72,7 +72,7 @@ fun SeatSelectionScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = SwiftRed),
                         enabled = bookingViewModel.selectedSeats.size == bookingViewModel.ticketCount
                     ) {
-                        Text("Simpan", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("Submit", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -106,12 +106,12 @@ fun SeatSelectionScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Penumpang", style = MaterialTheme.typography.bodyMedium, color = SwiftGray)
-                        val seatStr = if (bookingViewModel.selectedSeats.isNotEmpty()) {
-                            bookingViewModel.selectedSeats.joinToString(", ") { "$selectedCoachId-$it" }
-                        } else "Belum pilih"
+                        Text("Passenger", style = MaterialTheme.typography.bodyMedium, color = SwiftGray)
+                        
+                        val firstPassenger = bookingViewModel.passengers.firstOrNull()?.name?.ifBlank { "Passenger" } ?: "Passenger"
+                        val extra = if (bookingViewModel.ticketCount > 1) " + ${bookingViewModel.ticketCount - 1}" else ""
                         Text(
-                            "${bookingViewModel.passengers.size} Penumpang / $seatStr",
+                            "$firstPassenger$extra >",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = SwiftBlack
@@ -119,7 +119,7 @@ fun SeatSelectionScreen(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Pilih Kereta", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = SwiftBlack)
+                    Text("Select carriage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = SwiftBlack)
                     Spacer(modifier = Modifier.height(12.dp))
 
                     LazyRow(
@@ -166,12 +166,12 @@ fun SeatSelectionScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Pilih tempat duduk", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = SwiftBlack)
+                        Text("Select seat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = SwiftBlack)
                         Text(
-                            "Dipilih: ${bookingViewModel.selectedSeats.size}/${bookingViewModel.ticketCount}",
+                            "Selected: ${bookingViewModel.selectedSeats.size}",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (bookingViewModel.selectedSeats.size == bookingViewModel.ticketCount) SwiftTeal else SwiftRed
+                            color = SwiftBlack
                         )
                     }
 
@@ -207,7 +207,7 @@ fun SeatSelectionScreen(
                                     }
 
                                     // Aisle
-                                    Spacer(modifier = Modifier.width(28.dp))
+                                    Text("AISLE", color = SwiftGrayLight, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp))
 
                                     // Right Side (D, F)
                                     listOf("D", "F").forEach { letter ->
@@ -257,42 +257,39 @@ private fun CoachTab(coachId: String, isSelected: Boolean, onClick: () -> Unit) 
 
 @Composable
 private fun SeatIcon(seatId: String, isAvailable: Boolean, isSelected: Boolean, onClick: () -> Unit) {
-    val bgColor = when {
-        isSelected -> SwiftRed
-        !isAvailable -> SwiftGrayLight
-        else -> SwiftPinkBg
-    }
-    
-    val borderColor = when {
-        isSelected -> SwiftRed
-        !isAvailable -> SwiftGrayLight
-        else -> SwiftRedLight.copy(alpha = 0.5f)
-    }
-    
-    val textColor = when {
-        isSelected -> SwiftWhite
-        !isAvailable -> SwiftGrayMedium
-        else -> SwiftRed
-    }
+    val imageRes = if (isAvailable) com.example.swift.R.drawable.kursiwhoosh_available else com.example.swift.R.drawable.kursiwhoosh_unavailable
+    val textColor = if (isSelected) SwiftWhite else SwiftRed
 
     Box(
         modifier = Modifier
             .width(42.dp)
             .height(48.dp)
-            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 2.dp, bottomEnd = 2.dp))
-            .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 2.dp, bottomEnd = 2.dp))
+            .clip(RoundedCornerShape(8.dp))
             .clickable(enabled = isAvailable) { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = seatId,
-            color = textColor,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+        // Background Image
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = imageRes),
+            contentDescription = "Seat $seatId",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit
         )
-        // Simulate armrest visually
-        Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp).background(borderColor))
+        
+        // Selected overlay
+        if (isSelected) {
+            Box(modifier = Modifier.fillMaxSize().background(SwiftRed.copy(alpha = 0.6f)))
+        }
+
+        // Text only if available
+        if (isAvailable) {
+            Text(
+                text = seatId,
+                color = textColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
