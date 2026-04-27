@@ -1,0 +1,26 @@
+﻿.\gradlew.bat : e: file://
+:12:1 Syntax error: 
+    + FullyQualifiedError 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: Expecting a top 
+e: file:///C:/Users/user/S
+error: imports are only 
+   > Compilation error. 
