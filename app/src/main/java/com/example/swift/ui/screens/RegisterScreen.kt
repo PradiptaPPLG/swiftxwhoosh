@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.swift.ui.theme.*
 import com.example.swift.viewmodel.AuthState
 import com.example.swift.viewmodel.AuthViewModel
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,15 +148,70 @@ fun RegisterScreen(
             )
 
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Password should include at least three of the following: uppercase letters, lowercase letters, numbers, and special symbols, with a length of 8-16 digits.",
-                style = MaterialTheme.typography.bodySmall,
-                color = SwiftDarkTeal,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SwiftTeal.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                    .padding(8.dp)
-            )
+            
+            // Real-time password validation
+            if (password.isNotEmpty()) {
+                val hasUppercase = password.any { it.isUpperCase() }
+                val hasLowercase = password.any { it.isLowerCase() }
+                val hasDigit = password.any { it.isDigit() }
+                val hasSpecial = password.any { !it.isLetterOrDigit() }
+                val isLengthOk = password.length in 8..16
+                val criteriaCount = listOf(hasUppercase, hasLowercase, hasDigit, hasSpecial).count { it }
+                
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (isLengthOk && criteriaCount >= 3) Color(0xFF4CAF50).copy(alpha = 0.1f)
+                            else SwiftRed.copy(alpha = 0.08f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(10.dp)
+                ) {
+                    @Composable
+                    fun CriteriaRow(label: String, met: Boolean) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 1.dp)) {
+                            Text(
+                                text = if (met) "✓" else "✗",
+                                color = if (met) Color(0xFF4CAF50) else SwiftRed,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (met) Color(0xFF4CAF50) else SwiftRed
+                            )
+                        }
+                    }
+                    CriteriaRow("8-16 characters", isLengthOk)
+                    CriteriaRow("Uppercase letter (A-Z)", hasUppercase)
+                    CriteriaRow("Lowercase letter (a-z)", hasLowercase)
+                    CriteriaRow("Number (0-9)", hasDigit)
+                    CriteriaRow("Special symbol (!@#\$...)", hasSpecial)
+                    
+                    if (!isLengthOk || criteriaCount < 3) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Must meet length + at least 3 of the 4 criteria above",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SwiftRed,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "Password should include at least three of the following: uppercase letters, lowercase letters, numbers, and special symbols, with a length of 8-16 digits.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SwiftDarkTeal,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SwiftTeal.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

@@ -158,7 +158,7 @@ fun SwiftNavigation() {
             ScheduleScreen(
                 bookingViewModel = bookingViewModel,
                 onTimeSelected = {
-                    navController.navigate(Screen.CoachSelection.route)
+                    navController.navigate(Screen.PassengerDetails.route)
                 },
                 onBack = { navController.popBackStack() }
             )

@@ -202,7 +202,10 @@ fun SeatSelectionScreen(
                                             seatId = seatId,
                                             isAvailable = seat?.isAvailable == true,
                                             isSelected = bookingViewModel.selectedSeats.contains(seatId),
-                                            onClick = { bookingViewModel.toggleSeatSelection(seatId) }
+                                            onClick = { 
+                                                val sId = bookingViewModel.schedules.find { it.departureTime.startsWith(bookingViewModel.selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
+                                                bookingViewModel.toggleSeatSelection(seatId, sId) 
+                                            }
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                     }
@@ -218,7 +221,10 @@ fun SeatSelectionScreen(
                                             seatId = seatId,
                                             isAvailable = seat?.isAvailable == true,
                                             isSelected = bookingViewModel.selectedSeats.contains(seatId),
-                                            onClick = { bookingViewModel.toggleSeatSelection(seatId) }
+                                            onClick = { 
+                                                val sId = bookingViewModel.schedules.find { it.departureTime.startsWith(bookingViewModel.selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
+                                                bookingViewModel.toggleSeatSelection(seatId, sId) 
+                                            }
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                     }

@@ -147,25 +147,34 @@ fun ScheduleItem(
             .padding(top = 8.dp)
             .background(SwiftWhite)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onExpandToggle() }
-                .padding(16.dp),
-            verticalAlignment = Alignment.Top
+                .padding(16.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(depTime, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SwiftBlack)
-                    Text(" WIB", fontSize = 10.sp, color = SwiftGray, modifier = Modifier.padding(top = 8.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Departure
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(depTime, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SwiftBlack)
+                        Text(" WIB", fontSize = 10.sp, color = SwiftGray, modifier = Modifier.padding(bottom = 4.dp))
+                    }
+                    
+                    // Train code + arrow
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(schedule.trainCode, fontSize = 12.sp, color = SwiftGray)
-                        Icon(Icons.Default.ArrowRightAlt, contentDescription = null, tint = SwiftGrayLight)
+                        Icon(Icons.Default.ArrowRightAlt, contentDescription = null, tint = SwiftGrayLight, modifier = Modifier.size(18.dp))
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(arrTime, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SwiftBlack)
-                    Text(" WIB", fontSize = 10.sp, color = SwiftGray, modifier = Modifier.padding(top = 8.dp))
+                    
+                    // Arrival
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(arrTime, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SwiftBlack)
+                        Text(" WIB", fontSize = 10.sp, color = SwiftGray, modifier = Modifier.padding(bottom = 4.dp))
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -197,16 +206,15 @@ fun ScheduleItem(
                         Text("Stop Station", color = SwiftRed.copy(alpha = 0.7f), fontSize = 14.sp)
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = SwiftRed.copy(alpha = 0.7f))
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        "Rp.${String.format("%,d", schedule.price.toDouble().toInt()).replace(",", ".")}",
+                        color = SwiftRed,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
-            
-            Text(
-                "Rp.${String.format("%,d", schedule.price.toDouble().toInt()).replace(",", ".")}",
-                color = SwiftRed,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
 
         if (isExpanded) {
             Column(

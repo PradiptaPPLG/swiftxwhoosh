@@ -45,6 +45,11 @@ fun PassengerDetailsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val savedPassengers = bookingViewModel.savedPassengers
+    
+    // Auto-fetch saved passengers from PostgreSQL
+    LaunchedEffect(Unit) {
+        bookingViewModel.fetchSavedPassengers(1) // TODO: Use real logged in userId
+    }
     val currentSelected = bookingViewModel.passengers
     val userId = authViewModel.userId.collectAsState().value ?: 0
 
@@ -179,7 +184,21 @@ fun PassengerDetailsScreen(
                         border = androidx.compose.foundation.BorderStroke(1.dp, SwiftRed),
                         shape = RoundedCornerShape(4.dp)
                     ) {
-                        Text("Select Passenger", color = SwiftRed)
+                        Text("Add New Passenger", color = SwiftRed)
+                    }
+
+                    if (savedPassengers.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Saved Passengers", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SwiftBlack)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = SwiftGrayLight.copy(alpha = 0.5f))
+                        savedPassengers.forEach { passenger ->
+                            PassengerListItem(
+                                passenger = passenger,
+                                isSelected = currentSelected.any { it.identityNumber == passenger.identityNumber },
+                                onToggle = { bookingViewModel.togglePassengerSelection(passenger, userId) },
+                                onEdit = { /* Not implemented yet */ }
+                            )
+                        }
                     }
                 }
             }
@@ -265,7 +284,10 @@ fun PassengerListItem(
                 Text(
                     text = passenger.name.ifBlank { "New Passenger" },
                     fontSize = 16.sp,
-                    color = SwiftBlack
+                    color = SwiftBlack,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
@@ -276,6 +298,7 @@ fun PassengerListItem(
                         text = passenger.passengerType.displayName,
                         fontSize = 10.sp,
                         color = SwiftGrayMedium,
+                        maxLines = 1,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }

@@ -13,6 +13,8 @@ import com.example.swift.utils.EmailSender
 import com.example.swift.api.RetrofitClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -73,12 +75,26 @@ class BookingViewModel : ViewModel() {
         isLoadingSavedPassengers = true
         viewModelScope.launch {
             try {
-                val response = apiService.getSavedPassengers(userId).execute().body()
-                if (response?.status == "success") {
-                    savedPassengers = response.data
+                val responseBody = withContext(Dispatchers.IO) {
+                    apiService.getSavedPassengers(userId).execute().body()
+                }
+                responseBody?.let { resp ->
+                    if (resp.status == "success") {
+                        val mapped = resp.passengers.map { p: com.example.swift.models.PassengerDTO ->
+                            PassengerDetail(
+                                name = p.name,
+                                identityType = if (p.identityType == "Passport") IdentityType.PASSPORT else IdentityType.ID_CARD,
+                                identityNumber = p.identityNumber,
+                                gender = if (p.gender.equals("Female", ignoreCase = true)) Gender.FEMALE else Gender.MALE
+                            )
+                        }
+                        withContext(Dispatchers.Main) {
+                            savedPassengers = mapped
+                        }
+                    }
                 }
             } catch (e: Exception) {
-                // Handle error
+                e.printStackTrace()
             } finally {
                 isLoadingSavedPassengers = false
             }
@@ -144,16 +160,40 @@ class BookingViewModel : ViewModel() {
         }
     }
 
-    fun toggleSeatSelection(seatId: String) {
+    fun toggleSeatSelection(seatId: String, scheduleId: Int) {
         val current = selectedSeats.toMutableList()
         if (current.contains(seatId)) {
             current.remove(seatId)
+            // Unlock on server
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    apiService.lockSeat(mapOf("schedule_id" to scheduleId, "seat_id" to seatId, "action" to "unlock")).execute()
+                } catch (e: Exception) { e.printStackTrace() }
+            }
         } else {
             if (current.size < ticketCount) {
                 current.add(seatId)
+                // Lock on server
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        apiService.lockSeat(mapOf("schedule_id" to scheduleId, "seat_id" to seatId, "action" to "lock")).execute()
+                    } catch (e: Exception) { e.printStackTrace() }
+                }
             } else {
-                current.removeAt(0)
+                val oldSeat = current.removeAt(0)
+                // Unlock old seat
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        apiService.lockSeat(mapOf("schedule_id" to scheduleId, "seat_id" to oldSeat, "action" to "unlock")).execute()
+                    } catch (e: Exception) { e.printStackTrace() }
+                }
                 current.add(seatId)
+                // Lock new seat
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        apiService.lockSeat(mapOf("schedule_id" to scheduleId, "seat_id" to seatId, "action" to "lock")).execute()
+                    } catch (e: Exception) { e.printStackTrace() }
+                }
             }
         }
         selectedSeats = current
@@ -174,7 +214,9 @@ class BookingViewModel : ViewModel() {
         isLoadingSeats = true
         viewModelScope.launch {
             try {
-                val response = apiService.getSeats(scheduleId, selectedCoachId).execute().body()
+                val response = withContext(Dispatchers.IO) {
+                    apiService.getSeats(scheduleId, selectedCoachId).execute().body()
+                }
                 val occupied = response?.occupiedSeats ?: emptyList<String>()
                 
                 val seatLetters = listOf("A", "B", "C", "D", "F")
@@ -193,7 +235,7 @@ class BookingViewModel : ViewModel() {
                     selectedCoachId = coaches.first().id
                 }
             } catch (e: Exception) {
-                // Handle error
+                e.printStackTrace()
             } finally {
                 isLoadingSeats = false
             }
@@ -205,7 +247,8 @@ class BookingViewModel : ViewModel() {
         return "SWF-" + (1..8).map { chars.random() }.joinToString("")
     }
 
-    fun processFinalBooking(userId: Int) {
+    fun processFinalBooking(userIdParam: Int) {
+        val userId = if (userIdParam <= 0) 1 else userIdParam // Fallback ke user 1 jika 0
         val isPassengersValid = passengers.all { it.name.isNotBlank() && it.identityNumber.isNotBlank() }
         if (passengers.isEmpty() || passengers.size != ticketCount || !isPassengersValid) {
             bookingErrorMessage = "Please complete all passenger details."
@@ -217,44 +260,85 @@ class BookingViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                // Note: Real API call for saving passengers would go here
-                delay(1000)
-                val code = generateBookingCode()
-                val completeBk = BookingData(
-                    bookingCode = code,
-                    passengerName = passengers.first().name,
-                    passengerEmail = passengers.first().email,
-                    passengers = passengers.toList(),
-                    origin = origin,
-                    destination = destination,
-                    ticketCount = ticketCount,
-                    departureDate = departureDate,
-                    departureTime = selectedTime ?: "00:00",
-                    arrivalTime = arrivalTime,
-                    travelDuration = travelDuration,
-                    coachClass = selectedCoach ?: CoachClass.PREMIUM_ECONOMY,
-                    selectedCoachId = selectedCoachId,
-                    selectedSeats = selectedSeats,
-                    pricePerTicket = pricePerTicket,
+                // 1. Save all passengers to database
+                withContext(Dispatchers.IO) {
+                    passengers.forEach { p ->
+                        val resp = apiService.savePassenger(
+                            userId = userId,
+                            name = p.name,
+                            identityType = p.identityType.displayName,
+                            identityNumber = p.identityNumber,
+                            gender = p.gender.displayName,
+                            dateOfBirth = p.dateOfBirth,
+                            phone = p.whatsapp,
+                            email = p.email
+                        ).execute()
+                        
+                        if (!resp.isSuccessful) {
+                            println("DEBUG: Save passenger failed: ${resp.errorBody()?.string()}")
+                        }
+                    }
+                }
+
+                // 2. Book the seats officially (Set to paid)
+                val currentScheduleId = schedules.find { it.departureTime == selectedTime }?.scheduleId?.toIntOrNull() ?: 17
+                
+                val seatRequest = BookSeatRequest(
+                    userId = userId,
+                    scheduleId = currentScheduleId, 
+                    coachId = selectedCoachId,
+                    seats = selectedSeats,
                     totalPrice = totalPrice
                 )
-                currentBooking = completeBk
-                bookingComplete = true
-                
-                // Mark seats as occupied in DB
-                val scheduleId = schedules.find { it.departureTime.startsWith(selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
-                val seatReq = mapOf(
-                    "schedule_id" to scheduleId,
-                    "coach_id" to selectedCoachId,
-                    "seats" to selectedSeats
-                )
-                apiService.bookSeats(seatReq).execute()
-                
-                EmailSender.sendTicketEmail(completeBk, formatCurrency(totalPrice))
+
+                val bookingResponse = withContext(Dispatchers.IO) {
+                    apiService.bookSeats(seatRequest).execute().body()
+                }
+
+                if (bookingResponse?.get("status") == "success") {
+                    val code = bookingResponse["code"]?.toString() ?: bookingResponse["booking_code"]?.toString() ?: generateBookingCode()
+                    val completeBk = BookingData(
+                        bookingCode = code,
+                        passengerName = passengers.first().name,
+                        passengerEmail = passengers.first().email,
+                        passengers = passengers.toList(),
+                        origin = origin,
+                        destination = destination,
+                        ticketCount = ticketCount,
+                        departureDate = departureDate,
+                        departureTime = selectedTime ?: "00:00",
+                        arrivalTime = arrivalTime,
+                        travelDuration = travelDuration,
+                        coachClass = selectedCoach ?: CoachClass.PREMIUM_ECONOMY,
+                        selectedCoachId = selectedCoachId,
+                        selectedSeats = selectedSeats,
+                        pricePerTicket = pricePerTicket,
+                        totalPrice = totalPrice
+                    )
+                    
+                    // Send Email and Update UI
+                    withContext(Dispatchers.IO) {
+                        try { EmailSender.sendTicketEmail(completeBk, formatCurrency(totalPrice)) } catch(e: Exception) {}
+                    }
+                    
+                    withContext(Dispatchers.Main) {
+                        currentBooking = completeBk
+                        bookingComplete = true
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        bookingErrorMessage = bookingResponse?.get("message")?.toString() ?: "Failed to complete booking."
+                    }
+                }
             } catch (e: Exception) {
-                bookingErrorMessage = "Booking failed: ${e.message}"
+                withContext(Dispatchers.Main) {
+                    bookingErrorMessage = "Booking failed: ${e.message}"
+                }
+                e.printStackTrace()
             } finally {
-                isProcessingBooking = false
+                withContext(Dispatchers.Main) {
+                    isProcessingBooking = false
+                }
             }
         }
     }

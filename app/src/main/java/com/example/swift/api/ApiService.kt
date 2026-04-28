@@ -1,9 +1,12 @@
 package com.example.swift.api
 
 import retrofit2.Call
+import retrofit2.http.Body
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
+import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Query
 import com.example.swift.models.*
 
 interface ApiService {
@@ -48,12 +51,15 @@ interface ApiService {
         @Field("email") email: String
     ): Call<Map<String, Any>>
 
-    @retrofit2.http.GET("get_seats.php")
+    @GET("get_seats.php")
     fun getSeats(
-        @retrofit2.http.Query("schedule_id") scheduleId: Int,
-        @retrofit2.http.Query("coach_id") coachId: String
+        @Query("schedule_id") scheduleId: Int,
+        @Query("coach_id") coachId: String
     ): Call<OccupiedSeatsResponse>
 
-    @retrofit2.http.POST("book_seats.php")
-    fun bookSeats(@retrofit2.http.Body seatRequest: Map<String, Any>): Call<Map<String, Any>>
+    @POST("book_seats.php")
+    fun bookSeats(@Body request: BookSeatRequest): Call<Map<String, Any>>
+
+    @POST("lock_seat.php")
+    fun lockSeat(@Body lockRequest: Map<String, Any>): Call<Map<String, Any>>
 }

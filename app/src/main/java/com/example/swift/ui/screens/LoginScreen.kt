@@ -78,14 +78,14 @@ fun LoginScreen(
 
         // Title
         Text(
-            text = "Enter Account Name and password",
+            text = "Enter your E-mail and password",
             style = MaterialTheme.typography.headlineSmall,
             color = SwiftBlack,
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Please log in using your registered username or email",
+            text = "Please log in using your registered e-mail address",
             style = MaterialTheme.typography.bodyMedium,
             color = SwiftGray,
             modifier = Modifier.fillMaxWidth()
@@ -97,7 +97,7 @@ fun LoginScreen(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Username or email") },
+            label = { Text("E-mail") },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),

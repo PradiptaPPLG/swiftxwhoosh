@@ -82,10 +82,15 @@ object DepartureSchedule {
 
     fun calculateArrival(departureTime: String, durationMinutes: Int): String {
         return try {
-            val parts = departureTime.split(":")
+            // Jika departureTime berisi tanggal (misal: "2026-04-28 08:00"), ambil bagian waktunya saja
+            val timeOnly = if (departureTime.contains(" ")) departureTime.split(" ")[1] else departureTime
+            
+            val parts = timeOnly.split(":")
             if (parts.size < 2) return departureTime
-            val depHour = parts[0].toInt()
-            val depMin = parts[1].toInt()
+            
+            // Ambil hanya angka (regex) untuk jaga-jaga ada karakter aneh
+            val depHour = parts[0].filter { it.isDigit() }.toInt()
+            val depMin = parts[1].filter { it.isDigit() }.toInt()
 
             var totalMinutes = depHour * 60 + depMin + durationMinutes
             val arrivalHour = (totalMinutes / 60) % 24
@@ -143,12 +148,26 @@ data class ScheduleDocument(
     val departureTime: String = ""
 )
 
+data class PassengerDTO(
+    val name: String,
+    @SerializedName("identity_type") val identityType: String,
+    @SerializedName("identity_number") val identityNumber: String,
+    val gender: String
+)
+
 data class SavedPassengersResponse(
     val status: String,
-    val data: List<PassengerDetail>
+    val passengers: List<PassengerDTO>
 )
 
 data class OccupiedSeatsResponse(
     val status: String,
     @SerializedName("occupied_seats") val occupiedSeats: List<String>
+)
+data class BookSeatRequest(
+    @SerializedName("user_id") val userId: Int,
+    @SerializedName("schedule_id") val scheduleId: Int,
+    @SerializedName("coach_id") val coachId: String,
+    @SerializedName("seats") val seats: List<String>,
+    @SerializedName("total_price") val totalPrice: Int
 )
