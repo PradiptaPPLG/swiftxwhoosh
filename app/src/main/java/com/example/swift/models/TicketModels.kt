@@ -169,5 +169,46 @@ data class BookSeatRequest(
     @SerializedName("schedule_id") val scheduleId: Int,
     @SerializedName("coach_id") val coachId: String,
     @SerializedName("seats") val seats: List<String>,
+    @SerializedName("passenger_names") val passengerNames: List<String>,
     @SerializedName("total_price") val totalPrice: Int
+)
+
+// Real Dynamic Booking Models
+data class UserBooking(
+    @SerializedName("booking_id") val bookingId: Int,
+    @SerializedName("booking_code") val bookingCode: String,
+    @SerializedName("total_price") val totalPrice: Int,
+    @SerializedName("status") val status: String, // 'paid', 'unpaid', 'cancelled', 'refunded'
+    @SerializedName("order_time") val orderTime: String,
+    @SerializedName("origin_station") val originStation: String,
+    @SerializedName("destination_station") val destinationStation: String,
+    @SerializedName("departure_time") val departureTime: String, // Format: YYYY-MM-DD HH:mm:ss
+    @SerializedName("train_number") val trainNumber: String,
+    @SerializedName("passenger_names") val passengerNames: String,
+    @SerializedName("ticket_count") val ticketCount: Int
+) {
+    // Logika 2 Jam: Wajib dilakukan minimal 2 jam sebelum keberangkatan
+    fun canBeModified(): Boolean {
+        return try {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+            val departureDate = sdf.parse(departureTime)
+            val now = java.util.Date()
+            
+            if (departureDate == null) return false
+            
+            // Selisih dalam milidetik
+            val diff = departureDate.time - now.time
+            val twoHoursInMs = 2 * 60 * 60 * 1000L
+            
+            diff > twoHoursInMs
+        } catch (e: Exception) {
+            false
+        }
+    }
+}
+
+data class UserBookingsResponse(
+    val status: String,
+    val bookings: List<UserBooking> = emptyList(),
+    val message: String? = null
 )

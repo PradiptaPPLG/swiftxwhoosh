@@ -163,21 +163,23 @@ fun PaymentGatewayScreen(
                                 .padding(horizontal = 16.dp, vertical = 20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Stylized Bank Logo Placeholder
-                            Surface(
-                                color = bankColors[index],
-                                shape = RoundedCornerShape(4.dp),
-                                modifier = Modifier.size(width = 44.dp, height = 28.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        bank.split(" ").last(), 
-                                        color = SwiftWhite, 
-                                        fontSize = 8.sp, 
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                            // Actual Bank Logo Image
+                            val bankLogo = when(bank) {
+                                "Bank Mandiri" -> com.example.swift.R.drawable.mandiri
+                                "Bank BNI" -> com.example.swift.R.drawable.bni
+                                "Bank BRI" -> com.example.swift.R.drawable.bri
+                                "Bank BTN" -> com.example.swift.R.drawable.btn
+                                else -> com.example.swift.R.drawable.logo
                             }
+                            
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = bankLogo),
+                                contentDescription = bank,
+                                modifier = Modifier
+                                    .size(width = 44.dp, height = 28.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                            )
                             Spacer(modifier = Modifier.width(16.dp))
                             Text(bank, fontSize = 16.sp, color = SwiftBlack, fontWeight = FontWeight.Medium)
                         }
@@ -187,13 +189,36 @@ fun PaymentGatewayScreen(
                     }
                 }
             }
+        }
+    }
 
-            if (isProcessingPayment) {
-                Box(
-                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center
+    // GLOBAL PROCESSING OVERLAY (Anti-Ngumpet Version)
+    if (isProcessingPayment) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false
+            )
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SwiftWhite),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
-                    CircularProgressIndicator(color = SwiftWhite)
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(color = SwiftRed)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Processing Payment...", fontWeight = FontWeight.Medium, color = SwiftBlack)
+                    }
                 }
             }
         }
@@ -246,7 +271,7 @@ fun PaymentGatewayScreen(
                         }
                     }
                     
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         "Payment Successful!", 
                         fontSize = 26.sp, 
@@ -262,10 +287,10 @@ fun PaymentGatewayScreen(
                         modifier = Modifier.padding(horizontal = 32.dp)
                     )
                     
-                    Spacer(modifier = Modifier.height(48.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
                     CircularProgressIndicator(
                         color = Color(0xFF16A34A),
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(28.dp),
                         strokeWidth = 3.dp
                     )
                 }

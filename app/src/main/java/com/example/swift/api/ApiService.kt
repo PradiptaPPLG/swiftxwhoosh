@@ -65,4 +65,7 @@ interface ApiService {
 
     @POST("reschedule_booking.php")
     fun rescheduleBooking(@Body request: Map<String, String>): Call<Map<String, Any>>
+
+    @GET("get_user_bookings.php")
+    fun getUserBookings(@Query("user_id") userId: Int): Call<UserBookingsResponse>
 }

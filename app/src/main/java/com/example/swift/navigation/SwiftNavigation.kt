@@ -350,7 +350,24 @@ fun MainScreenWithBottomNav(
                     onScheduleInfoClick = onScheduleInfoClick,
                     onAnnouncementClick = onAnnouncementClick
                 )
-                1 -> MyTicketsScreen(onTicketClick = onTicketClick)
+                1 -> MyTicketsScreen(
+                    authViewModel = authViewModel,
+                    bookingViewModel = bookingViewModel,
+                    onTicketClick = { booking ->
+                        // Store the selected booking in VM or pass as arg
+                        bookingViewModel.currentBooking = com.example.swift.models.BookingData(
+                            bookingCode = booking.bookingCode,
+                            passengerName = booking.passengerNames,
+                            origin = com.example.swift.models.Station.values().find { it.displayName == booking.originStation } ?: com.example.swift.models.Station.HALIM,
+                            destination = com.example.swift.models.Station.values().find { it.displayName == booking.destinationStation } ?: com.example.swift.models.Station.TEGALLUAR,
+                            totalPrice = booking.totalPrice,
+                            departureDate = booking.departureTime.split(" ")[0],
+                            departureTime = booking.departureTime.split(" ")[1],
+                            ticketCount = booking.ticketCount
+                        )
+                        onTicketClick()
+                    }
+                )
                 2 -> AccountScreen(
                     authViewModel = authViewModel,
                     onLogout = onLogout

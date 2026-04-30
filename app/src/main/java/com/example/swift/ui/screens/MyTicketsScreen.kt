@@ -2,6 +2,7 @@ package com.example.swift.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,7 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -22,36 +24,64 @@ import com.example.swift.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyTicketsScreen(
-    onTicketClick: () -> Unit
+    authViewModel: com.example.swift.viewmodel.AuthViewModel,
+    bookingViewModel: com.example.swift.viewmodel.BookingViewModel,
+    onTicketClick: (com.example.swift.models.UserBooking) -> Unit
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(1) } // Default to "Paid"
     val tabs = listOf("Unpaid", "Paid", "History")
+    val userIdState by authViewModel.userId.collectAsState()
+    val userId = userIdState ?: 0
 
-    val historyTickets = listOf(
-        HistoryTicket("GA11443449", "Halim", "Tegalluar Summarecon", "G1059", "20:25 10/04/2026", "09:13 10/04/2026", 2, "Kiki Supendi MT"),
-        HistoryTicket("GA11441658", "Tegalluar Summarecon", "Halim", "G1046", "16:35 09/04/2026", "15:45 09/04/2026", 1, "Kiki Supendi MT"),
-        HistoryTicket("GA71474531", "Halim", "Tegalluar Summarecon", "G1059", "20:25 07/04/2026", "09:07 07/04/2026", 2, "Kiki Supendi MT"),
-        HistoryTicket("GA01457111", "Tegalluar Summarecon", "Halim", "G1062", "16:35 04/04/2026", "15:40 04/04/2026", 1, "Kiki Supendi MT")
-    )
+    LaunchedEffect(userId) {
+        if (userId > 0) {
+            bookingViewModel.fetchUserBookings(userId)
+        }
+    }
+
+    val now = java.util.Date()
+    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+
+    val filteredTickets = remember(bookingViewModel.userBookings.toList(), selectedTabIndex) {
+        val bookings = bookingViewModel.userBookings.toList()
+        val nowTime = now.time
+        
+        when (selectedTabIndex) {
+            0 -> bookings.filter { it.status == "unpaid" }
+            1 -> bookings.filter { 
+                val departureDate = try { sdf.parse(it.departureTime) } catch(e: Exception) { null }
+                val depTime = departureDate?.time ?: 0L
+                it.status == "paid" && depTime > nowTime
+            }
+            2 -> bookings.filter { 
+                val departureDate = try { sdf.parse(it.departureTime) } catch(e: Exception) { null }
+                val depTime = departureDate?.time ?: 0L
+                it.status in listOf("cancelled", "refunded", "rescheduled") || 
+                (depTime > 0 && depTime <= nowTime)
+            }
+            else -> emptyList()
+        }
+    }
 
     Scaffold(
         topBar = {
-            Column {
+            Column(modifier = Modifier.background(SwiftWhite)) {
                 TopAppBar(
-                    title = { Text("My Tickets", modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontSize = 18.sp) },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = SwiftWhite,
-                        titleContentColor = SwiftBlack
-                    )
+                    title = { Text("My Tickets", modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = SwiftBlack) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = SwiftWhite)
                 )
                 TabRow(
                     selectedTabIndex = selectedTabIndex,
                     containerColor = SwiftWhite,
                     contentColor = SwiftRed,
+                    divider = {},
                     indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                            color = SwiftRed
+                        Box(
+                            Modifier
+                                .tabIndicatorOffset(tabPositions[selectedTabIndex])
+                                .height(3.dp)
+                                .padding(horizontal = 24.dp)
+                                .background(SwiftRed, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
                         )
                     }
                 ) {
@@ -63,7 +93,8 @@ fun MyTicketsScreen(
                                 Text(
                                     text = title,
                                     color = if (selectedTabIndex == index) SwiftRed else SwiftGray,
-                                    fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 14.sp
                                 )
                             }
                         )
@@ -75,35 +106,35 @@ fun MyTicketsScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(SwiftPinkBg)
+                .background(SwiftPinkBg.copy(alpha = 0.4f))
                 .padding(padding)
         ) {
-            if (selectedTabIndex == 2) {
+            if (bookingViewModel.isLoadingUserBookings) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = SwiftRed)
+            } else if (filteredTickets.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = com.example.swift.R.drawable.logo),
+                        contentDescription = null,
+                        modifier = Modifier.size(100.dp).alpha(0.1f),
+                        tint = SwiftBlack
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("No tickets in ${tabs[selectedTabIndex]}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = SwiftGrayMedium)
+                    Text("Your travel history will appear here", fontSize = 14.sp, color = SwiftGray)
+                }
+            } else {
                 androidx.compose.foundation.lazy.LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(historyTickets.size) { index ->
-                        HistoryTicketCard(historyTickets[index], onClick = onTicketClick)
-                    }
-                }
-            } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.Search,
-                            contentDescription = "No Data",
-                            modifier = Modifier.size(80.dp),
-                            tint = SwiftGrayLight
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No Data",
-                            fontSize = 18.sp,
-                            color = SwiftGrayMedium,
-                            fontWeight = FontWeight.Medium
-                        )
+                    items(filteredTickets.size) { index ->
+                        PremiumTicketCard(filteredTickets[index], onClick = { onTicketClick(filteredTickets[index]) })
                     }
                 }
             }
@@ -112,55 +143,165 @@ fun MyTicketsScreen(
 }
 
 @Composable
-private fun HistoryTicketCard(ticket: HistoryTicket, onClick: () -> Unit) {
+private fun PremiumTicketCard(ticket: com.example.swift.models.UserBooking, onClick: () -> Unit) {
+    val canModify = ticket.canBeModified() && ticket.status == "paid"
+    
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SwiftWhite),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Surface(
-                    color = Color(0xFF91A3B0),
-                    shape = RoundedCornerShape(topStart = 4.dp, bottomEnd = 12.dp),
-                    modifier = Modifier.offset(x = (-16).dp, y = (-16).dp)
+        Column {
+            // Top Section (Status & Train Code)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(if (ticket.status == "paid") Color(0xFFFDECEC) else Color(0xFFFFF7E6))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(if (ticket.status == "paid") SwiftRed else Color(0xFFFAAD14), RoundedCornerShape(50))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = ticket.status.uppercase(),
+                        color = if (ticket.status == "paid") SwiftRed else Color(0xFFD48806),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = ticket.bookingCode,
+                    color = SwiftGrayMedium,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Route Section
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Single", color = SwiftWhite, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(ticket.departureTime.split(" ")[1].substring(0, 5), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = SwiftBlack)
+                        Text(ticket.originStation, fontSize = 14.sp, color = SwiftGray, fontWeight = FontWeight.Medium)
+                    }
+                    
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 8.dp)) {
+                        Text(ticket.trainNumber, color = SwiftRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(6.dp).background(SwiftRed, RoundedCornerShape(50)))
+                            androidx.compose.material3.HorizontalDivider(
+                                modifier = Modifier.width(50.dp),
+                                color = SwiftRed.copy(alpha = 0.3f),
+                                thickness = 1.dp
+                            )
+                            Icon(
+                                painter = painterResource(id = com.example.swift.R.drawable.logo),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp).padding(2.dp),
+                                tint = SwiftRed
+                            )
+                        }
+                    }
+
+                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                        Text("Arrival", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = SwiftBlack)
+                        Text(ticket.destinationStation, fontSize = 14.sp, color = SwiftGray, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                    }
                 }
-                Text(ticket.orderId, color = SwiftGray, fontSize = 12.sp)
-            }
-            
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(ticket.origin, color = SwiftBlack, fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(ticket.trainNo, color = SwiftGray, fontSize = 10.sp)
-                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.width(40.dp).padding(vertical = 2.dp), color = SwiftGrayLight)
+
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Passenger & Info
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            painter = painterResource(id = com.example.swift.R.drawable.logo),
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = SwiftGrayMedium
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${ticket.ticketCount} Tickets • ${ticket.passengerNames.split(",")[0]}${if (ticket.ticketCount > 1) " & others" else ""}",
+                            color = SwiftGrayMedium,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    
+                    Text(
+                        text = "Rp " + String.format("%,d", ticket.totalPrice).replace(",", "."),
+                        color = SwiftBlack,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(ticket.destination, color = SwiftBlack, fontSize = 14.sp)
+
+                if (ticket.status == "paid") {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    androidx.compose.material3.HorizontalDivider(
+                        color = SwiftGrayLight.copy(alpha = 0.5f),
+                        thickness = 0.5.dp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (!canModify) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Default.Search,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = SwiftRed
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Locked (<2h to dep)",
+                                    color = SwiftRed,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.width(1.dp))
+                        }
+                        
+                        Button(
+                            onClick = { /* Reschedule logic */ },
+                            enabled = canModify,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (canModify) SwiftRed else SwiftGrayLight,
+                                contentColor = SwiftWhite
+                            ),
+                            modifier = Modifier.height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Reschedule", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Text("Departure: ${ticket.departureTime}", color = SwiftGray, fontSize = 12.sp)
-            Text("Order Time: ${ticket.orderTime}", color = SwiftGray, fontSize = 12.sp)
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text("${ticket.ticketCount} tickets  ${ticket.passengerName}", color = SwiftGray, fontSize = 12.sp)
         }
     }
 }
-
-private data class HistoryTicket(
-    val orderId: String,
-    val origin: String,
-    val destination: String,
-    val trainNo: String,
-    val departureTime: String,
-    val orderTime: String,
-    val ticketCount: Int,
-    val passengerName: String
-)

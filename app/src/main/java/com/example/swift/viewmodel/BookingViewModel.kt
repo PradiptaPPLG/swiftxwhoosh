@@ -44,6 +44,31 @@ class BookingViewModel : ViewModel() {
     var ticketEmailSent by mutableStateOf(false)
     var currentBooking by mutableStateOf<BookingData?>(null)
 
+    // User Bookings (My Tickets)
+    var userBookings = mutableStateListOf<UserBooking>()
+    var isLoadingUserBookings by mutableStateOf(false)
+
+    fun fetchUserBookings(userId: Int) {
+        isLoadingUserBookings = true
+        apiService.getUserBookings(userId).enqueue(object : retrofit2.Callback<UserBookingsResponse> {
+            override fun onResponse(call: retrofit2.Call<UserBookingsResponse>, response: retrofit2.Response<UserBookingsResponse>) {
+                isLoadingUserBookings = false
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body?.status == "success") {
+                        userBookings.clear()
+                        userBookings.addAll(body.bookings)
+                    }
+                }
+            }
+
+            override fun onFailure(call: retrofit2.Call<UserBookingsResponse>, t: Throwable) {
+                isLoadingUserBookings = false
+                Log.e("BookingViewModel", "Failed to fetch bookings: ${t.message}")
+            }
+        })
+    }
+
     // Saved Passengers
     var savedPassengers by mutableStateOf<List<PassengerDetail>>(emptyList())
     var isLoadingSavedPassengers by mutableStateOf(false)
@@ -312,6 +337,7 @@ class BookingViewModel : ViewModel() {
                     scheduleId = currentScheduleId, 
                     coachId = selectedCoachId,
                     seats = selectedSeats,
+                    passengerNames = passengers.map { it.name },
                     totalPrice = totalPrice
                 )
 

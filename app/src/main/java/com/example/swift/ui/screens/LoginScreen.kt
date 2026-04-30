@@ -60,18 +60,10 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(60.dp))
 
         // Logo
-        Icon(
-            imageVector = Icons.Default.Train,
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = com.example.swift.R.drawable.logo),
             contentDescription = "Swift Logo",
-            tint = SwiftRed,
-            modifier = Modifier.size(64.dp)
-        )
-        Text(
-            text = "Swift",
-            color = SwiftRed,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.ExtraBold,
-            fontStyle = FontStyle.Italic
+            modifier = Modifier.size(120.dp)
         )
 
         Spacer(modifier = Modifier.height(32.dp))
