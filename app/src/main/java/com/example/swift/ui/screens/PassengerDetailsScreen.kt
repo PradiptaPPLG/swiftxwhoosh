@@ -46,21 +46,27 @@ fun PassengerDetailsScreen(
     val coroutineScope = rememberCoroutineScope()
     val savedPassengers = bookingViewModel.savedPassengers
     
-    // Auto-fetch saved passengers from PostgreSQL
-    LaunchedEffect(Unit) {
-        bookingViewModel.fetchSavedPassengers(1) // TODO: Use real logged in userId
-    }
-    val currentSelected = bookingViewModel.passengers
     val userId = authViewModel.userId.collectAsState().value ?: 0
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
-    LaunchedEffect(Unit) {
-        bookingViewModel.fetchSavedPassengers(userId)
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                bookingViewModel.fetchSavedPassengers(userId)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
+
+    val currentSelected = bookingViewModel.passengers
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Book", fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+            CenterAlignedTopAppBar(
+                title = { Text("Book", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -187,7 +193,15 @@ fun PassengerDetailsScreen(
                         Text("Add New Passenger", color = SwiftRed)
                     }
 
-                    if (savedPassengers.isNotEmpty()) {
+                    if (bookingViewModel.isLoadingSavedPassengers) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = SwiftRed)
+                        }
+                    } else if (savedPassengers.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("No saved passengers found", color = SwiftGray, fontSize = 14.sp)
+                        }
+                    } else {
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Saved Passengers", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SwiftBlack)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = SwiftGrayLight.copy(alpha = 0.5f))
