@@ -18,21 +18,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.swift.models.IdentityType
-import com.example.swift.models.PassengerDetail
-import com.example.swift.models.PassengerType
-import com.example.swift.models.Gender
+import com.example.swift.models.*
 import com.example.swift.ui.theme.*
+import com.example.swift.viewmodel.AuthViewModel
 import com.example.swift.viewmodel.BookingViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPassengerScreen(
     bookingViewModel: BookingViewModel,
+    authViewModel: AuthViewModel,
     onSave: () -> Unit,
     onBack: () -> Unit
 ) {
     var passenger by remember { mutableStateOf(PassengerDetail()) }
+    
+    // Auto-fill email from account if empty
+    val accountEmail by authViewModel.userEmail.collectAsState()
+    LaunchedEffect(accountEmail) {
+        if (passenger.email.isBlank() && accountEmail.isNotBlank()) {
+            passenger = passenger.copy(email = accountEmail)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -56,16 +63,27 @@ fun AddPassengerScreen(
         bottomBar = {
             Surface(color = SwiftWhite, shadowElevation = 16.dp) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    val isFormValid = passenger.name.isNotBlank() && 
+                                      passenger.identityNumber.isNotBlank() && 
+                                      passenger.email.isNotBlank() &&
+                                      android.util.Patterns.EMAIL_ADDRESS.matcher(passenger.email).matches()
+
                     Button(
                         onClick = {
-                            bookingViewModel.addPassenger(passenger)
-                            onSave()
+                            if (isFormValid) {
+                                bookingViewModel.addPassenger(passenger)
+                                onSave()
+                            }
                         },
                         modifier = Modifier.fillMaxWidth().height(54.dp),
+                        enabled = isFormValid,
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = SwiftRed)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SwiftRed,
+                            disabledContainerColor = SwiftGrayLight
+                        )
                     ) {
-                        Text("Submit", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SwiftWhite)
+                        Text("Submit", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (isFormValid) SwiftWhite else SwiftGray)
                     }
                 }
             }

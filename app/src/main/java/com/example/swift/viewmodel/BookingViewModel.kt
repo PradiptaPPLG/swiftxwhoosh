@@ -1,5 +1,6 @@
 package com.example.swift.viewmodel
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,17 +41,33 @@ class BookingViewModel : ViewModel() {
     var bookingErrorMessage by mutableStateOf<String?>(null)
 
     var bookingComplete by mutableStateOf(false)
+    var ticketEmailSent by mutableStateOf(false)
     var currentBooking by mutableStateOf<BookingData?>(null)
 
     // Saved Passengers
     var savedPassengers by mutableStateOf<List<PassengerDetail>>(emptyList())
     var isLoadingSavedPassengers by mutableStateOf(false)
 
+    // Booking action status — prevents conflicting actions
+    enum class BookingStatus { ACTIVE, CANCELLED, REFUNDED, RESCHEDULED }
+    var bookingStatus by mutableStateOf(BookingStatus.ACTIVE)
+    
+    fun resetBookingProcess() {
+        bookingComplete = false
+        ticketEmailSent = false
+        bookingErrorMessage = null
+        passengers.clear()
+        selectedSeats = emptyList()
+        bookingStatus = BookingStatus.ACTIVE
+        // Note: we don't clear currentBooking here because it's used to show the last ticket
+    }
+
     // Real API State
     var schedules by mutableStateOf<List<com.example.swift.api.TrainSchedule>>(emptyList())
     var isLoadingSchedules by mutableStateOf(false)
 
     fun fetchSchedules() {
+        resetBookingProcess()
         isLoadingSchedules = true
         apiService.getSchedules(origin.displayName, destination.displayName)
             .enqueue(object : retrofit2.Callback<List<com.example.swift.api.TrainSchedule>> {
@@ -85,7 +102,8 @@ class BookingViewModel : ViewModel() {
                                 name = p.name,
                                 identityType = if (p.identityType == "Passport") IdentityType.PASSPORT else IdentityType.ID_CARD,
                                 identityNumber = p.identityNumber,
-                                gender = if (p.gender.equals("Female", ignoreCase = true)) Gender.FEMALE else Gender.MALE
+                                gender = if (p.gender.equals("Female", ignoreCase = true)) Gender.FEMALE else Gender.MALE,
+                                email = "" // Will be handled by fallback in processFinalBooking
                             )
                         }
                         withContext(Dispatchers.Main) {
@@ -220,12 +238,14 @@ class BookingViewModel : ViewModel() {
                 val occupied = response?.occupiedSeats ?: emptyList<String>()
                 
                 val seatLetters = listOf("A", "B", "C", "D", "F")
-                val mockCoaches = (1..2).map { coachNum ->
+                val mockCoaches = (1..8).map { coachNum ->
                     val coachId = String.format("%02d", coachNum)
                     val seats = (1..13).flatMap { row ->
                         seatLetters.map { letter ->
                             val seatId = "$row$letter"
-                            Seat(seatId, isAvailable = !occupied.contains(seatId))
+                            // Check if this specific seat in this specific coach is occupied
+                            val isOccupied = occupied.contains("$coachId-$seatId")
+                            Seat(seatId, isAvailable = !isOccupied)
                         }
                     }
                     Coach(coachId, seats)
@@ -247,8 +267,12 @@ class BookingViewModel : ViewModel() {
         return "SWF-" + (1..8).map { chars.random() }.joinToString("")
     }
 
-    fun processFinalBooking(userIdParam: Int) {
-        val userId = if (userIdParam <= 0) 1 else userIdParam // Fallback ke user 1 jika 0
+    fun processFinalBooking(userIdParam: Int, accountEmailFallback: String = "") {
+        if (userIdParam <= 0) {
+            bookingErrorMessage = "Session error: User not logged in. Please logout and login again."
+            return
+        }
+        val userId = userIdParam
         val isPassengersValid = passengers.all { it.name.isNotBlank() && it.identityNumber.isNotBlank() }
         if (passengers.isEmpty() || passengers.size != ticketCount || !isPassengersValid) {
             bookingErrorMessage = "Please complete all passenger details."
@@ -297,10 +321,16 @@ class BookingViewModel : ViewModel() {
 
                 if (bookingResponse?.get("status") == "success") {
                     val code = bookingResponse["code"]?.toString() ?: bookingResponse["booking_code"]?.toString() ?: generateBookingCode()
+                    var targetEmail = passengers.firstOrNull()?.email ?: ""
+                    if (targetEmail.isBlank()) {
+                        Log.d("BookingViewModel", "Passenger email empty, falling back to account email: $accountEmailFallback")
+                        targetEmail = accountEmailFallback
+                    }
+                    
                     val completeBk = BookingData(
                         bookingCode = code,
-                        passengerName = passengers.first().name,
-                        passengerEmail = passengers.first().email,
+                        passengerName = passengers.firstOrNull()?.name ?: "Passenger",
+                        passengerEmail = targetEmail,
                         passengers = passengers.toList(),
                         origin = origin,
                         destination = destination,
@@ -315,11 +345,6 @@ class BookingViewModel : ViewModel() {
                         pricePerTicket = pricePerTicket,
                         totalPrice = totalPrice
                     )
-                    
-                    // Send Email and Update UI
-                    withContext(Dispatchers.IO) {
-                        try { EmailSender.sendTicketEmail(completeBk, formatCurrency(totalPrice)) } catch(e: Exception) {}
-                    }
                     
                     withContext(Dispatchers.Main) {
                         currentBooking = completeBk
@@ -357,10 +382,47 @@ class BookingViewModel : ViewModel() {
         bookingErrorMessage = null
         bookingComplete = false
         currentBooking = null
+        bookingStatus = BookingStatus.ACTIVE
     }
 
     fun formatCurrency(amount: Int): String {
         val formatted = String.format("%,d", amount).replace(",", ".")
         return "Rp $formatted"
+    }
+
+    fun rescheduleBooking(bookingCode: String, newDate: String) {
+        viewModelScope.launch {
+            try {
+                val request = mapOf(
+                    "booking_code" to bookingCode,
+                    "new_date" to newDate
+                )
+                withContext(Dispatchers.IO) {
+                    apiService.rescheduleBooking(request).execute()
+                }
+            } catch (e: Exception) {
+                Log.e("BookingViewModel", "Reschedule API error: ${e.message}")
+            }
+        }
+    }
+
+    fun sendFinalTicketEmail() {
+        if (ticketEmailSent) return
+        val booking = currentBooking ?: return
+        val formattedPrice = formatCurrency(booking.totalPrice)
+        ticketEmailSent = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Log.d("BookingViewModel", "Sending Final Ticket email to: ${booking.passengerEmail}")
+                val result = EmailSender.sendTicketEmail(booking, formattedPrice)
+                Log.d("BookingViewModel", "Final Ticket email result: $result")
+                if (result) {
+                     // We don't have snackbarHostState here, so we rely on the one in OrderDetailsScreen
+                     // or we can just log it.
+                }
+            } catch (e: Exception) {
+                Log.e("BookingViewModel", "Error sending final ticket email: ${e.message}")
+            }
+        }
     }
 }

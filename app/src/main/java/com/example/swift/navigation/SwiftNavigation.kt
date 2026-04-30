@@ -179,6 +179,9 @@ fun SwiftNavigation() {
                 bookingViewModel = bookingViewModel,
                 authViewModel = authViewModel,
                 onNextClicked = {
+                    navController.navigate(Screen.PaymentSummary.route)
+                },
+                onSelectSeatClicked = {
                     navController.navigate(Screen.SeatSelection.route)
                 },
                 onAddPassengerClicked = {
@@ -191,6 +194,7 @@ fun SwiftNavigation() {
         composable(Screen.AddPassenger.route) {
             AddPassengerScreen(
                 bookingViewModel = bookingViewModel,
+                authViewModel = authViewModel,
                 onSave = { navController.popBackStack() },
                 onBack = { navController.popBackStack() }
             )
@@ -232,6 +236,7 @@ fun SwiftNavigation() {
         composable(Screen.PaymentSucceeded.route) {
             OrderDetailsScreen(
                 bookingViewModel = bookingViewModel,
+                authViewModel = authViewModel,
                 title = "Payment Succeeded",
                 onBack = {
                     navController.navigate(Screen.Main.route) {
@@ -245,6 +250,7 @@ fun SwiftNavigation() {
         composable(Screen.OrderDetails.route) {
             OrderDetailsScreen(
                 bookingViewModel = bookingViewModel,
+                authViewModel = authViewModel,
                 title = "Order Details",
                 onBack = { navController.popBackStack() }
             )

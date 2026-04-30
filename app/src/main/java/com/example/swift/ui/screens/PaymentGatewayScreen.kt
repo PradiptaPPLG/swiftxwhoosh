@@ -1,15 +1,20 @@
 package com.example.swift.ui.screens
 
+import android.util.Log
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.swift.ui.theme.*
 import com.example.swift.viewmodel.BookingViewModel
+import com.example.swift.utils.EmailSender
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +51,16 @@ fun PaymentGatewayScreen(
     val timeString = String.format("%02d:%02d", min, sec)
 
     val currentBooking = bookingViewModel.currentBooking
+    val scope = rememberCoroutineScope()
+    var isProcessingPayment by remember { mutableStateOf(false) }
+    var showSuccessAnimation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showSuccessAnimation) {
+        if (showSuccessAnimation) {
+            delay(2000L)
+            onPaymentSuccess()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -131,7 +148,18 @@ fun PaymentGatewayScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onPaymentSuccess() }
+                                .clickable {
+                                    if (!isProcessingPayment && !showSuccessAnimation) {
+                                        isProcessingPayment = true
+                                        scope.launch {
+                                            delay(1500L) // Simulate bank processing
+                                            isProcessingPayment = false
+                                            // Trigger email early
+                                            bookingViewModel.sendFinalTicketEmail()
+                                            showSuccessAnimation = true
+                                        }
+                                    }
+                                }
                                 .padding(horizontal = 16.dp, vertical = 20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -157,6 +185,89 @@ fun PaymentGatewayScreen(
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = SwiftGrayLight)
                         }
                     }
+                }
+            }
+
+            if (isProcessingPayment) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = SwiftWhite)
+                }
+            }
+        }
+    }
+
+    // FULL SCREEN SUCCESS OVERLAY (Using Dialog to force top-level centering)
+    if (showSuccessAnimation) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    var iconVisible by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) { 
+                        delay(100)
+                        iconVisible = true 
+                    }
+                    
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = iconVisible,
+                        enter = scaleIn(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(120.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF16A34A),
+                            shadowElevation = 8.dp
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(80.dp)
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Text(
+                        "Payment Successful!", 
+                        fontSize = 26.sp, 
+                        fontWeight = FontWeight.ExtraBold, 
+                        color = SwiftBlack
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Your ticket is being sent to your email...", 
+                        color = SwiftGray,
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(48.dp))
+                    CircularProgressIndicator(
+                        color = Color(0xFF16A34A),
+                        modifier = Modifier.size(32.dp),
+                        strokeWidth = 3.dp
+                    )
                 }
             }
         }

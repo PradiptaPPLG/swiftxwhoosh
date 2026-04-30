@@ -62,4 +62,7 @@ interface ApiService {
 
     @POST("lock_seat.php")
     fun lockSeat(@Body lockRequest: Map<String, Any>): Call<Map<String, Any>>
+
+    @POST("reschedule_booking.php")
+    fun rescheduleBooking(@Body request: Map<String, String>): Call<Map<String, Any>>
 }

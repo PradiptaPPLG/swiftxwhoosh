@@ -39,6 +39,7 @@ fun PassengerDetailsScreen(
     bookingViewModel: BookingViewModel,
     authViewModel: AuthViewModel,
     onNextClicked: () -> Unit,
+    onSelectSeatClicked: () -> Unit,
     onAddPassengerClicked: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -82,7 +83,7 @@ fun PassengerDetailsScreen(
         bottomBar = {
             Column(modifier = Modifier.background(SwiftWhite).padding(16.dp)) {
                 Button(
-                    onClick = { /* Navigate to seat selection */ },
+                    onClick = { onSelectSeatClicked() },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(4.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333))
@@ -205,13 +206,26 @@ fun PassengerDetailsScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Saved Passengers", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SwiftBlack)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = SwiftGrayLight.copy(alpha = 0.5f))
-                        savedPassengers.forEach { passenger ->
+                        
+                        var visibleCount by remember { mutableIntStateOf(5) }
+                        val displayedPassengers = savedPassengers.take(visibleCount)
+                        
+                        displayedPassengers.forEach { passenger ->
                             PassengerListItem(
                                 passenger = passenger,
                                 isSelected = currentSelected.any { it.identityNumber == passenger.identityNumber },
                                 onToggle = { bookingViewModel.togglePassengerSelection(passenger, userId) },
                                 onEdit = { /* Not implemented yet */ }
                             )
+                        }
+                        
+                        if (savedPassengers.size > visibleCount) {
+                            TextButton(
+                                onClick = { visibleCount += 5 },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Show More (${savedPassengers.size - visibleCount} left)", color = SwiftRed, fontSize = 12.sp)
+                            }
                         }
                     }
                 }

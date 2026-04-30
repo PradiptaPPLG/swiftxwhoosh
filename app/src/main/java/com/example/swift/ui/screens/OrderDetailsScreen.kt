@@ -1,5 +1,6 @@
 package com.example.swift.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,27 +15,93 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.Modifier
+import com.example.swift.models.BookingData
 import com.example.swift.ui.theme.*
+import com.example.swift.viewmodel.AuthViewModel
 import com.example.swift.viewmodel.BookingViewModel
+import com.example.swift.utils.EmailSender
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrderDetailsScreen(
     bookingViewModel: BookingViewModel,
+    authViewModel: AuthViewModel,
     title: String = "Order Details",
     onBack: () -> Unit
 ) {
     val currentBooking = bookingViewModel.currentBooking
+    if (currentBooking == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = SwiftRed)
+        }
+        return
+    }
+
     var showQrDialog by remember { mutableStateOf(false) }
+    var showCancelDialog by remember { mutableStateOf(false) }
+    var showRescheduleDialog by remember { mutableStateOf(false) }
+    var showRefundDialog by remember { mutableStateOf(false) }
+    var showInfantDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    
+    // Trigger email only if this is the Success screen
+    LaunchedEffect(Unit) {
+        if (title == "Payment Succeeded") {
+            Log.d("OrderDetailsScreen", "Success screen detected. Flag ticketEmailSent = ${bookingViewModel.ticketEmailSent}")
+            if (!bookingViewModel.ticketEmailSent) {
+                scope.launch { snackbarHostState.showSnackbar("Sending ticket email to ${currentBooking.passengerEmail}...") }
+                bookingViewModel.sendFinalTicketEmail()
+            }
+        }
+    }
+    
+    // Reschedule flow states
+    var showRescheduleDatePicker by remember { mutableStateOf(false) }
+    var newSelectedDate by remember { mutableStateOf("") }
+    
+    // Initialize editableEmail from passenger data, fallback to account email if empty
+    val accountEmail by authViewModel.userEmail.collectAsState()
+    var editableEmail by remember(currentBooking) { 
+        mutableStateOf(currentBooking.passengerEmail.ifBlank { accountEmail }) 
+    }
+
+    // Reschedule Date Picker
+    if (showRescheduleDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = System.currentTimeMillis() + (24 * 60 * 60 * 1000) // Tomorrow
+        )
+        DatePickerDialog(
+            onDismissRequest = { showRescheduleDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val date = datePickerState.selectedDateMillis
+                    if (date != null) {
+                        val sdf = java.text.SimpleDateFormat("EEEE, dd MMM yyyy", java.util.Locale.getDefault())
+                        newSelectedDate = sdf.format(java.util.Date(date))
+                    }
+                    showRescheduleDatePicker = false
+                }) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRescheduleDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
@@ -62,7 +129,6 @@ fun OrderDetailsScreen(
                 .background(SwiftPinkBg)
                 .padding(padding)
         ) {
-            // Top Red Background
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -75,11 +141,10 @@ fun OrderDetailsScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
-                // Order Info
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text("Order Number: ${currentBooking?.bookingCode ?: "GA81662081"}", color = SwiftWhite, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Order Time: 07:36 18/04/2026", color = SwiftWhite, fontSize = 14.sp)
+                    Text("Order Time: ${currentBooking?.departureDate ?: "18/04/2026"}", color = SwiftWhite, fontSize = 14.sp)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -113,34 +178,82 @@ fun OrderDetailsScreen(
                             Text(currentBooking?.origin?.displayName ?: "Halim", color = SwiftGray, fontSize = 14.sp)
                             Text(currentBooking?.destination?.displayName ?: "Tegalluar", color = SwiftGray, fontSize = 14.sp)
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+
+                        // Status badge
+                        val status = bookingViewModel.bookingStatus
+                        val (statusLabel, statusColor) = when (status) {
+                            BookingViewModel.BookingStatus.ACTIVE -> "ACTIVE" to Color(0xFF16A34A)
+                            BookingViewModel.BookingStatus.CANCELLED -> "CANCELLED" to SwiftRed
+                            BookingViewModel.BookingStatus.REFUNDED -> "REFUNDED PENDING" to Color(0xFF16A34A)
+                            BookingViewModel.BookingStatus.RESCHEDULED -> "RESCHEDULED" to Color(0xFF1A6EDB)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            Surface(
+                                color = statusColor.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            ) {
+                                Text(
+                                    "● $statusLabel",
+                                    color = statusColor,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        val isActive = status == BookingViewModel.BookingStatus.ACTIVE
+
+                        // Reschedule + Refund buttons
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             OutlinedButton(
-                                onClick = { },
+                                onClick = { if (isActive) showRescheduleDialog = true },
+                                enabled = isActive,
                                 modifier = Modifier.weight(1f).height(48.dp),
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftBlack),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, SwiftGrayLight)
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isActive) SwiftBlack else SwiftGrayMedium),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isActive) SwiftGrayLight else SwiftGrayLight.copy(alpha = 0.3f))
                             ) {
                                 Text("Reschedule")
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             OutlinedButton(
-                                onClick = { },
+                                onClick = { if (isActive) showRefundDialog = true },
+                                enabled = isActive,
                                 modifier = Modifier.weight(1f).height(48.dp),
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftBlack),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, SwiftGrayLight)
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isActive) SwiftBlack else SwiftGrayMedium),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isActive) SwiftGrayLight else SwiftGrayLight.copy(alpha = 0.3f))
                             ) {
                                 Text("Refund")
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Cancel button
+                        OutlinedButton(
+                            onClick = { if (isActive) showCancelDialog = true },
+                            enabled = isActive,
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isActive) SwiftRed else SwiftGrayMedium),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isActive) SwiftRed.copy(alpha = 0.5f) else SwiftGrayLight.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                if (status == BookingViewModel.BookingStatus.CANCELLED) "Booking Cancelled" else "Cancel Booking",
+                                color = if (isActive) SwiftRed else SwiftGrayMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Passenger Card
+                // Passenger Cards
                 currentBooking?.passengers?.forEachIndexed { index, passenger ->
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -151,25 +264,13 @@ fun OrderDetailsScreen(
                         Column {
                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Column {
-                                        Text(
-                                            text = passenger.name,
-                                            fontSize = 16.sp,
-                                            color = SwiftBlack,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Surface(
-                                            color = SwiftGrayLight.copy(alpha = 0.5f),
-                                            shape = RoundedCornerShape(4.dp)
-                                        ) {
-                                            Text(
-                                                text = "${passenger.passengerType.displayName} ticket",
-                                                fontSize = 10.sp,
-                                                color = SwiftGrayMedium,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                            )
-                                        }
+                                    Text(passenger.name, fontSize = 16.sp, color = SwiftBlack, fontWeight = FontWeight.SemiBold)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Surface(
+                                        color = SwiftGrayLight.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text("${passenger.passengerType.displayName} ticket", fontSize = 10.sp, color = SwiftGrayMedium, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     val hiddenId = if (passenger.identityNumber.length > 4) {
@@ -183,7 +284,6 @@ fun OrderDetailsScreen(
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(bookingViewModel.formatCurrency(currentBooking.pricePerTicket), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SwiftBlack)
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    // QR Code Button
                                     Surface(
                                         color = Color(0xFFFDF0E1),
                                         shape = RoundedCornerShape(4.dp),
@@ -197,9 +297,10 @@ fun OrderDetailsScreen(
                                     }
                                 }
                             }
-                            
+
+                            // Add Infant button
                             OutlinedButton(
-                                onClick = { },
+                                onClick = { showInfantDialog = true },
                                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).height(48.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftBlack),
@@ -216,7 +317,7 @@ fun OrderDetailsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("Total payment amount:", color = SwiftGray, fontSize = 14.sp)
-                                Text(bookingViewModel.formatCurrency(currentBooking.pricePerTicket), color = SwiftBlack, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text(bookingViewModel.formatCurrency(currentBooking.totalPrice), color = SwiftBlack, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -236,11 +337,11 @@ fun OrderDetailsScreen(
                     Column {
                         Text("Reminder", fontSize = 16.sp, color = SwiftBlack)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("1. The ticket you purchased this time has been issued, You can enter the station with the QR code of the ticket, or enter the station after exchanging the paper ticket at the station window.", color = SwiftBlack, fontSize = 14.sp)
+                        Text("1. You can enter the station with the QR code of the ticket, or exchange for a paper ticket at the station window.", color = SwiftBlack, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("2. After exchanging for a paper ticket, the ticket cannot be refunded or Rescheduled on the APP.", color = SwiftBlack, fontSize = 14.sp)
+                        Text("2. After exchanging for a paper ticket, the ticket cannot be refunded or rescheduled on the APP.", color = SwiftBlack, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("3. You can save a screenshot of the current order details interface so that you can view the seat position when taking the bus.", color = SwiftBlack, fontSize = 14.sp)
+                        Text("3. Cancellation is allowed up to 24 hours before departure. Refunds are processed within 3–7 business days.", color = SwiftBlack, fontSize = 14.sp)
                     }
                 }
 
@@ -249,7 +350,231 @@ fun OrderDetailsScreen(
         }
     }
 
+    // ── Dialogs ───────────────────────────────────────────────────────────────
+
     if (showQrDialog) {
         QRCodeDialog(bookingViewModel = bookingViewModel, onDismiss = { showQrDialog = false })
+    }
+
+    // Cancel Dialog
+    if (showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            icon = { Text("⚠️", fontSize = 32.sp) },
+            title = { Text("Cancel Booking?", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to cancel booking ${currentBooking?.bookingCode}? A refund will be processed if eligible.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelDialog = false
+                        bookingViewModel.bookingStatus = BookingViewModel.BookingStatus.CANCELLED
+                        scope.launch {
+                            currentBooking?.let { b ->
+                                EmailSender.sendCancellationEmail(b, bookingViewModel.formatCurrency(b.totalPrice), "Cancelled by user via app")
+                            }
+                            snackbarHostState.showSnackbar("❌ Booking cancelled. Confirmation email sent.")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SwiftRed)
+                ) { Text("Yes, Cancel") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showCancelDialog = false }) { Text("Go Back") }
+            }
+        )
+    }
+
+    // Reschedule Dialog
+    if (showRescheduleDialog) {
+        AlertDialog(
+            onDismissRequest = { showRescheduleDialog = false },
+            icon = { Text("🔄", fontSize = 32.sp) },
+            title = { Text("Reschedule Ticket", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Select a new date for your journey. Please note that rescheduling may be subject to availability.")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    OutlinedButton(
+                        onClick = { showRescheduleDatePicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftBlack),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SwiftGrayLight)
+                    ) {
+                        Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(18.dp), tint = SwiftGray)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (newSelectedDate.isEmpty()) "Select New Date" else "New Date: $newSelectedDate")
+                    }
+                    
+                    if (newSelectedDate.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            color = Color(0xFF1A6EDB).copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Reschedule from ${currentBooking!!.departureDate} to $newSelectedDate",
+                                modifier = Modifier.padding(12.dp),
+                                fontSize = 12.sp,
+                                color = Color(0xFF1A6EDB),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Confirmation Email:", fontSize = 12.sp, color = SwiftBlack, fontWeight = FontWeight.SemiBold)
+                        OutlinedTextField(
+                            value = editableEmail,
+                            onValueChange = { editableEmail = it },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            placeholder = { Text("Enter valid email", fontSize = 14.sp) },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                unfocusedBorderColor = SwiftGrayLight,
+                                focusedBorderColor = Color(0xFF1A6EDB)
+                            )
+                        )
+                        if (editableEmail.contains(".") && !editableEmail.contains("@")) {
+                             Text("Please enter a valid email address", color = SwiftRed, fontSize = 10.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newSelectedDate.isEmpty()) {
+                            showRescheduleDatePicker = true
+                            return@Button
+                        }
+                        
+                        val isEmailValid = editableEmail.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(editableEmail).matches()
+                        if (!isEmailValid) {
+                            scope.launch { snackbarHostState.showSnackbar("Please enter a valid email address") }
+                            return@Button
+                        }
+
+                        val oldDate = currentBooking!!.departureDate
+                        showRescheduleDialog = false
+                        
+                        // Update currentBooking data with new email if changed
+                        val updatedBooking = currentBooking!!.copy(
+                            departureDate = newSelectedDate,
+                            passengerEmail = editableEmail
+                        )
+                        
+                        // Update VM state to lock buttons
+                        bookingViewModel.bookingStatus = BookingViewModel.BookingStatus.RESCHEDULED
+                        
+                        // Update currentBooking data so the UI reflects the change
+                        bookingViewModel.currentBooking = updatedBooking
+                        
+                        // Update database
+                        bookingViewModel.rescheduleBooking(updatedBooking.bookingCode, newSelectedDate)
+                        
+                        scope.launch {
+                            Log.d("RescheduleFlow", "Sending reschedule email to $editableEmail")
+                            val result = EmailSender.sendRescheduleEmail(
+                                booking = updatedBooking,
+                                oldDate = oldDate,
+                                oldDeparture = updatedBooking.departureTime,
+                                oldArrival = updatedBooking.arrivalTime,
+                                newDate = newSelectedDate,
+                                newDeparture = updatedBooking.departureTime,
+                                newArrival = updatedBooking.arrivalTime,
+                                rescheduleReason = "Reschedule requested by user via app"
+                            )
+                            Log.d("RescheduleFlow", "Reschedule email result: $result")
+                            snackbarHostState.showSnackbar("🔄 Rescheduled. Email sent to $editableEmail.")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A6EDB)),
+                    enabled = newSelectedDate.isNotEmpty() && editableEmail.isNotBlank()
+                ) { Text("Confirm Reschedule") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRescheduleDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Refund Dialog
+    if (showRefundDialog) {
+        AlertDialog(
+            onDismissRequest = { showRefundDialog = false },
+            icon = { Text("💸", fontSize = 32.sp) },
+            title = { Text("Request Refund?", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("You are requesting a refund for:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Booking: ${currentBooking?.bookingCode ?: "-"}", fontWeight = FontWeight.SemiBold)
+                    Text("Amount: ${currentBooking?.let { bookingViewModel.formatCurrency(it.totalPrice) } ?: "-"}", fontWeight = FontWeight.SemiBold, color = Color(0xFF16A34A))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Refunds are processed within 3–7 business days to your original payment method.", color = SwiftGray, fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRefundDialog = false
+                        bookingViewModel.bookingStatus = BookingViewModel.BookingStatus.REFUNDED
+                        scope.launch {
+                            val b = currentBooking!!
+                            Log.d("RefundFlow", "Requesting refund for ${b.bookingCode}")
+                            val result = EmailSender.sendRefundEmail(
+                                booking = b,
+                                formattedRefundAmount = bookingViewModel.formatCurrency(b.totalPrice),
+                                refundMethod = "Virtual Account / Original Payment",
+                                estimatedDays = 5,
+                                refundReason = "Refund requested by user via app"
+                            )
+                            Log.d("RefundFlow", "Refund email sent: $result")
+                            snackbarHostState.showSnackbar("💸 Refund request submitted. Check your email.")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A))
+                ) { Text("Submit Refund") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRefundDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Add Infant Dialog
+    if (showInfantDialog) {
+        AlertDialog(
+            onDismissRequest = { showInfantDialog = false },
+            icon = { Text("👶", fontSize = 32.sp) },
+            title = { Text("Add Infant (0–2 years)", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Infants under 2 years old travel free of charge and share a seat with an accompanying adult.", color = SwiftGray, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Requirements:", fontWeight = FontWeight.SemiBold, color = SwiftBlack)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("• Must be accompanied by an adult passenger on this booking.", fontSize = 13.sp, color = SwiftGray)
+                    Text("• Infant's birth certificate or ID may be required at the station.", fontSize = 13.sp, color = SwiftGray)
+                    Text("• Maximum 1 infant per adult passenger.", fontSize = 13.sp, color = SwiftGray)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showInfantDialog = false
+                        scope.launch {
+                            snackbarHostState.showSnackbar("👶 Infant added to your booking. No extra charge.")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SwiftRed)
+                ) { Text("Add Infant") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showInfantDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }

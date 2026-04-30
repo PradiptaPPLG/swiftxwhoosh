@@ -114,7 +114,16 @@ fun PaymentSummaryScreen(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            onClick = { bookingViewModel.processFinalBooking(authViewModel.userId.value ?: 0) },
+                            onClick = { 
+                                val uid = authViewModel.userId.value ?: 0
+                                val accountEmail = authViewModel.userEmail.value ?: ""
+                                if (uid > 0) {
+                                    bookingViewModel.processFinalBooking(uid, accountEmail)
+                                } else {
+                                    // Manually trigger error if session is lost
+                                    bookingViewModel.bookingErrorMessage = "Session error: Please log out and log in again."
+                                }
+                            },
                             modifier = Modifier.weight(1.4f).height(48.dp),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = SwiftRed),
