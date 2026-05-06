@@ -152,14 +152,14 @@ fun PassengerDetailsScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ClassMiniCard("First Class", 600000, bookingViewModel.selectedCoach == CoachClass.FIRST, Modifier.weight(1f)) {
-                    bookingViewModel.selectedCoach = CoachClass.FIRST
+                ClassMiniCard("First Class", 600000, bookingViewModel.selectedCoachClass == CoachClass.FIRST, Modifier.weight(1f)) {
+                    bookingViewModel.selectedCoachClass = CoachClass.FIRST
                 }
-                ClassMiniCard("Business Class", 450000, bookingViewModel.selectedCoach == CoachClass.BUSINESS, Modifier.weight(1f)) {
-                    bookingViewModel.selectedCoach = CoachClass.BUSINESS
+                ClassMiniCard("Business Class", 450000, bookingViewModel.selectedCoachClass == CoachClass.BUSINESS, Modifier.weight(1f)) {
+                    bookingViewModel.selectedCoachClass = CoachClass.BUSINESS
                 }
-                ClassMiniCard("Premium Economy Class", 250000, bookingViewModel.selectedCoach == CoachClass.PREMIUM_ECONOMY, Modifier.weight(1f)) {
-                    bookingViewModel.selectedCoach = CoachClass.PREMIUM_ECONOMY
+                ClassMiniCard("Premium Economy Class", 250000, bookingViewModel.selectedCoachClass == CoachClass.PREMIUM_ECONOMY, Modifier.weight(1f)) {
+                    bookingViewModel.selectedCoachClass = CoachClass.PREMIUM_ECONOMY
                 }
             }
 

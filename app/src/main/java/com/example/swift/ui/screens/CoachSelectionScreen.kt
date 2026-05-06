@@ -110,7 +110,7 @@ fun CoachSelectionScreen(
             CoachClass.entries.forEach { coach ->
                 val price = TicketPricing.getPrice(coach, bookingViewModel.ticketCount)
                 val total = price * bookingViewModel.ticketCount
-                val isSelected = bookingViewModel.selectedCoach == coach
+                val isSelected = bookingViewModel.selectedCoachClass == coach
 
                 val (gradientColor, iconColor) = when (coach) {
                     CoachClass.PREMIUM_ECONOMY -> Pair(SwiftTeal, SwiftDarkTeal)
@@ -124,7 +124,7 @@ fun CoachSelectionScreen(
                         .padding(vertical = 6.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .clickable {
-                            bookingViewModel.selectedCoach = coach
+                            bookingViewModel.selectedCoachClass = coach
                             onCoachSelected()
                         }
                         .then(

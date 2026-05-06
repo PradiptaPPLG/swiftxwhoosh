@@ -118,7 +118,7 @@ fun ScheduleScreen(
                             onBook = { coachClass ->
                                 bookingViewModel.selectedTime = schedule.departureTime.substring(0, 5)
                                 bookingViewModel.selectedArrivalTime = schedule.arrivalTime.substring(0, 5)
-                                bookingViewModel.selectedCoach = coachClass
+                                bookingViewModel.selectedCoachClass = coachClass
                                 onTimeSelected()
                             },
                             bookingViewModel = bookingViewModel

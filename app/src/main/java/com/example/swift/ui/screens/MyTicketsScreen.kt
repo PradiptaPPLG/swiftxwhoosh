@@ -47,7 +47,7 @@ fun MyTicketsScreen(
         val nowTime = now.time
         
         when (selectedTabIndex) {
-            0 -> bookings.filter { it.status == "unpaid" }
+            0 -> bookings.filter { it.status == "pending" }
             1 -> bookings.filter { 
                 val departureDate = try { sdf.parse(it.departureTime) } catch(e: Exception) { null }
                 val depTime = departureDate?.time ?: 0L
@@ -134,7 +134,18 @@ fun MyTicketsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(filteredTickets.size) { index ->
-                        PremiumTicketCard(filteredTickets[index], onClick = { onTicketClick(filteredTickets[index]) })
+                        PremiumTicketCard(filteredTickets[index], onClick = { 
+                            // Sync status with VM before navigating
+                            bookingViewModel.bookingStatus = when(filteredTickets[index].status) {
+                                "paid" -> com.example.swift.viewmodel.BookingViewModel.BookingStatus.ACTIVE
+                                "pending" -> com.example.swift.viewmodel.BookingViewModel.BookingStatus.PENDING
+                                "refunded" -> com.example.swift.viewmodel.BookingViewModel.BookingStatus.REFUNDED
+                                "cancelled" -> com.example.swift.viewmodel.BookingViewModel.BookingStatus.CANCELLED
+                                "rescheduled" -> com.example.swift.viewmodel.BookingViewModel.BookingStatus.RESCHEDULED
+                                else -> com.example.swift.viewmodel.BookingViewModel.BookingStatus.ACTIVE
+                            }
+                            onTicketClick(filteredTickets[index]) 
+                        })
                     }
                 }
             }

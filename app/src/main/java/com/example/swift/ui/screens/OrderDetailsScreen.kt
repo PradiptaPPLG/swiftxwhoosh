@@ -187,6 +187,7 @@ fun OrderDetailsScreen(
                             BookingViewModel.BookingStatus.CANCELLED -> "CANCELLED" to SwiftRed
                             BookingViewModel.BookingStatus.REFUNDED -> "REFUNDED PENDING" to Color(0xFF16A34A)
                             BookingViewModel.BookingStatus.RESCHEDULED -> "RESCHEDULED" to Color(0xFF1A6EDB)
+                            BookingViewModel.BookingStatus.PENDING -> "WAITING FOR PAYMENT" to Color(0xFFE2913A)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             Surface(
@@ -205,6 +206,22 @@ fun OrderDetailsScreen(
                         }
 
                         val isActive = status == BookingViewModel.BookingStatus.ACTIVE
+                        val isPending = status == BookingViewModel.BookingStatus.PENDING
+
+                        if (isPending) {
+                             Button(
+                                 onClick = {
+                                     bookingViewModel.pendingBookingId = currentBooking.bookingId
+                                     onBack() 
+                                 },
+                                 modifier = Modifier.fillMaxWidth().height(48.dp),
+                                 shape = RoundedCornerShape(8.dp),
+                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE2913A))
+                             ) {
+                                 Text("Pay Now", fontWeight = FontWeight.Bold)
+                             }
+                             Spacer(modifier = Modifier.height(12.dp))
+                        }
 
                         // Reschedule + Refund buttons
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -449,49 +466,17 @@ fun OrderDetailsScreen(
                             showRescheduleDatePicker = true
                             return@Button
                         }
-                        
-                        val isEmailValid = editableEmail.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(editableEmail).matches()
-                        if (!isEmailValid) {
-                            scope.launch { snackbarHostState.showSnackbar("Please enter a valid email address") }
-                            return@Button
-                        }
-
-                        val oldDate = currentBooking!!.departureDate
                         showRescheduleDialog = false
                         
-                        // Update currentBooking data with new email if changed
-                        val updatedBooking = currentBooking!!.copy(
-                            departureDate = newSelectedDate,
-                            passengerEmail = editableEmail
-                        )
+                        // START REAL RESCHEDULE FLOW
+                        bookingViewModel.isRescheduling = true
+                        bookingViewModel.bookingToReschedule = currentBooking
+                        bookingViewModel.selectedSeats = emptyList() // Clear for new selection
                         
-                        // Update VM state to lock buttons
-                        bookingViewModel.bookingStatus = BookingViewModel.BookingStatus.RESCHEDULED
-                        
-                        // Update currentBooking data so the UI reflects the change
-                        bookingViewModel.currentBooking = updatedBooking
-                        
-                        // Update database
-                        bookingViewModel.rescheduleBooking(updatedBooking.bookingCode, newSelectedDate)
-                        
-                        scope.launch {
-                            Log.d("RescheduleFlow", "Sending reschedule email to $editableEmail")
-                            val result = EmailSender.sendRescheduleEmail(
-                                booking = updatedBooking,
-                                oldDate = oldDate,
-                                oldDeparture = updatedBooking.departureTime,
-                                oldArrival = updatedBooking.arrivalTime,
-                                newDate = newSelectedDate,
-                                newDeparture = updatedBooking.departureTime,
-                                newArrival = updatedBooking.arrivalTime,
-                                rescheduleReason = "Reschedule requested by user via app"
-                            )
-                            Log.d("RescheduleFlow", "Reschedule email result: $result")
-                            snackbarHostState.showSnackbar("🔄 Rescheduled. Email sent to $editableEmail.")
-                        }
+                        // Navigate back to Dashboard to pick new date/time
+                        onBack()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A6EDB)),
-                    enabled = newSelectedDate.isNotEmpty() && editableEmail.isNotBlank()
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A6EDB))
                 ) { Text("Confirm Reschedule") }
             },
             dismissButton = {
@@ -505,38 +490,29 @@ fun OrderDetailsScreen(
         AlertDialog(
             onDismissRequest = { showRefundDialog = false },
             icon = { Text("💸", fontSize = 32.sp) },
-            title = { Text("Request Refund?", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text("You are requesting a refund for:")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Booking: ${currentBooking?.bookingCode ?: "-"}", fontWeight = FontWeight.SemiBold)
-                    Text("Amount: ${currentBooking?.let { bookingViewModel.formatCurrency(it.totalPrice) } ?: "-"}", fontWeight = FontWeight.SemiBold, color = Color(0xFF16A34A))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Refunds are processed within 3–7 business days to your original payment method.", color = SwiftGray, fontSize = 13.sp)
-                }
-            },
+            title = { Text("Refund Ticket?", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to refund booking ${currentBooking?.bookingCode}? This will release your seats and cannot be undone.") },
             confirmButton = {
                 Button(
                     onClick = {
                         showRefundDialog = false
-                        bookingViewModel.bookingStatus = BookingViewModel.BookingStatus.REFUNDED
-                        scope.launch {
-                            val b = currentBooking!!
-                            Log.d("RefundFlow", "Requesting refund for ${b.bookingCode}")
-                            val result = EmailSender.sendRefundEmail(
-                                booking = b,
-                                formattedRefundAmount = bookingViewModel.formatCurrency(b.totalPrice),
-                                refundMethod = "Virtual Account / Original Payment",
-                                estimatedDays = 5,
-                                refundReason = "Refund requested by user via app"
-                            )
-                            Log.d("RefundFlow", "Refund email sent: $result")
-                            snackbarHostState.showSnackbar("💸 Refund request submitted. Check your email.")
+                        currentBooking?.let { b ->
+                            bookingViewModel.refundBooking(b.bookingId) { success ->
+                                if (success) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("✅ Refund successful. Seats released.")
+                                    }
+                                    onBack()
+                                } else {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("❌ Refund failed.")
+                                    }
+                                }
+                            }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A))
-                ) { Text("Submit Refund") }
+                    colors = ButtonDefaults.buttonColors(containerColor = SwiftRed)
+                ) { Text("Confirm Refund") }
             },
             dismissButton = {
                 OutlinedButton(onClick = { showRefundDialog = false }) { Text("Cancel") }

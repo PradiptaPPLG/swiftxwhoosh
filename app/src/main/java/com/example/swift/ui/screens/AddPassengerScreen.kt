@@ -31,8 +31,19 @@ fun AddPassengerScreen(
     onSave: () -> Unit,
     onBack: () -> Unit
 ) {
+    var isAddingNew by remember { mutableStateOf(false) }
     var passenger by remember { mutableStateOf(PassengerDetail()) }
     
+    val savedPassengers = bookingViewModel.savedPassengers
+    val userId by authViewModel.userId.collectAsState()
+
+    // Fetch passengers if empty
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            bookingViewModel.fetchSavedPassengers(userId!!)
+        }
+    }
+
     // Auto-fill email from account if empty
     val accountEmail by authViewModel.userEmail.collectAsState()
     LaunchedEffect(accountEmail) {
@@ -44,273 +55,135 @@ fun AddPassengerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Passenger", fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center) },
+                title = { Text(if (isAddingNew) "Add Passenger" else "Common Passenger", fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (isAddingNew) isAddingNew = false else onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    Spacer(modifier = Modifier.width(48.dp)) // To balance the back button and center title
+                    Spacer(modifier = Modifier.width(48.dp))
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SwiftWhite,
-                    titleContentColor = SwiftBlack,
-                    navigationIconContentColor = SwiftBlack
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = SwiftWhite)
             )
         },
         bottomBar = {
-            Surface(color = SwiftWhite, shadowElevation = 16.dp) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    val isFormValid = passenger.name.isNotBlank() && 
-                                      passenger.identityNumber.isNotBlank() && 
-                                      passenger.email.isNotBlank() &&
-                                      android.util.Patterns.EMAIL_ADDRESS.matcher(passenger.email).matches()
-
+            if (!isAddingNew) {
+                Surface(color = SwiftWhite, shadowElevation = 16.dp) {
+                    Button(
+                        onClick = { isAddingNew = true },
+                        modifier = Modifier.fillMaxWidth().padding(16.dp).height(54.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = SwiftRed)
+                    ) {
+                        Text("+ Add Passenger", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                Surface(color = SwiftWhite, shadowElevation = 16.dp) {
+                    val isFormValid = passenger.name.isNotBlank() && passenger.identityNumber.isNotBlank()
                     Button(
                         onClick = {
                             if (isFormValid) {
                                 bookingViewModel.addPassenger(passenger)
-                                onSave()
+                                isAddingNew = false
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp).height(54.dp),
                         enabled = isFormValid,
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SwiftRed,
-                            disabledContainerColor = SwiftGrayLight
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = SwiftRed, disabledContainerColor = SwiftGrayLight)
                     ) {
-                        Text("Submit", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (isFormValid) SwiftWhite else SwiftGray)
+                        Text("Save Passenger", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(SwiftPinkBg)
-                .padding(padding)
-        ) {
-            item {
-                SectionHeader("Personal Information")
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(0.dp),
-                    colors = CardDefaults.cardColors(containerColor = SwiftWhite)
+        if (!isAddingNew) {
+            // List View
+            if (savedPassengers.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Text("No saved passengers found", color = SwiftGray)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().background(SwiftPinkBg).padding(padding)
                 ) {
-                    Column(modifier = Modifier.padding(start = 16.dp)) {
-                        // Gender
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    items(savedPassengers.size) { index ->
+                        val p = savedPassengers[index]
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = SwiftWhite)
                         ) {
-                            Text("Gender", color = SwiftBlack, modifier = Modifier.weight(1f))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(
-                                    selected = passenger.gender == Gender.MALE,
-                                    onClick = { passenger = passenger.copy(gender = Gender.MALE) },
-                                    colors = RadioButtonDefaults.colors(selectedColor = SwiftRed)
-                                )
-                                Text("Male", color = SwiftGray, fontSize = 14.sp)
-                                Spacer(modifier = Modifier.width(16.dp))
-                                RadioButton(
-                                    selected = passenger.gender == Gender.FEMALE,
-                                    onClick = { passenger = passenger.copy(gender = Gender.FEMALE) },
-                                    colors = RadioButtonDefaults.colors(selectedColor = SwiftRed)
-                                )
-                                Text("Female", color = SwiftGray, fontSize = 14.sp)
-                            }
-                        }
-                        HorizontalDivider(color = SwiftGrayLight)
-
-                        // Date of birth
-                        var showDatePicker by remember { mutableStateOf(false) }
-                        val datePickerState = rememberDatePickerState()
-
-                        if (showDatePicker) {
-                            DatePickerDialog(
-                                onDismissRequest = { showDatePicker = false },
-                                confirmButton = {
-                                    TextButton(onClick = {
-                                        datePickerState.selectedDateMillis?.let { millis ->
-                                            val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(millis))
-                                            passenger = passenger.copy(dateOfBirth = date)
-                                        }
-                                        showDatePicker = false
-                                    }) { Text("OK", color = SwiftRed) }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(p.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text("${p.identityType.displayName}: ${p.identityNumber}", color = SwiftGray, fontSize = 14.sp)
                                 }
-                            ) {
-                                DatePicker(state = datePickerState)
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SwiftGrayLight)
                             }
                         }
-
-                        ClickableRow(
-                            label = "Date of birth", 
-                            value = passenger.dateOfBirth.ifBlank { "Please select a date of birth" }, 
-                            isPlaceholder = passenger.dateOfBirth.isBlank(),
-                            onClick = { showDatePicker = true }
-                        )
-
-                        // Passenger Type
-                        ClickableRow("Passenger Type", passenger.passengerType.displayName, false) {
-                            passenger = passenger.copy(
-                                passengerType = if (passenger.passengerType == PassengerType.ADULT) PassengerType.CHILD else PassengerType.ADULT
-                            )
-                        }
-
-                        // Discount type
-                        ClickableRow("Discount type", passenger.discountType, false)
-
-                        // Country/Region
-                        ClickableRow("Country/Region", passenger.countryRegion, false)
                     }
                 }
             }
-
-            item {
-                SectionHeader("Certificate Information")
-                Text(
-                    text = "The input information must be consistent with the certificate information.",
-                    color = SwiftRed,
-                    fontSize = 12.sp,
-                    modifier = Modifier.fillMaxWidth().background(SwiftRed.copy(alpha = 0.05f)).padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(0.dp),
-                    colors = CardDefaults.cardColors(containerColor = SwiftWhite)
-                ) {
-                    Column(modifier = Modifier.padding(start = 16.dp)) {
-                        ClickableRow("Document Type", passenger.identityType.displayName, false) {
-                            passenger = passenger.copy(
-                                identityType = if (passenger.identityType == IdentityType.ID_CARD) IdentityType.PASSPORT else IdentityType.ID_CARD
-                            )
+        } else {
+            // Form View
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().background(SwiftPinkBg).padding(padding)
+            ) {
+                item {
+                    SectionHeader("Personal Information")
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(0.dp), colors = CardDefaults.cardColors(containerColor = SwiftWhite)) {
+                        Column(modifier = Modifier.padding(start = 16.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Gender", modifier = Modifier.weight(1f))
+                                Row {
+                                    RadioButton(selected = passenger.gender == Gender.MALE, onClick = { passenger = passenger.copy(gender = Gender.MALE) })
+                                    Text("Male", modifier = Modifier.align(Alignment.CenterVertically))
+                                    RadioButton(selected = passenger.gender == Gender.FEMALE, onClick = { passenger = passenger.copy(gender = Gender.FEMALE) })
+                                    Text("Female", modifier = Modifier.align(Alignment.CenterVertically))
+                                }
+                            }
+                            HorizontalDivider(color = SwiftGrayLight)
+                            ClickableRow("Passenger Type", passenger.passengerType.displayName, false) {
+                                passenger = passenger.copy(passengerType = if (passenger.passengerType == PassengerType.ADULT) PassengerType.CHILD else PassengerType.ADULT)
+                            }
                         }
-                        
-                        // ID Card Input
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(passenger.identityType.displayName, color = SwiftBlack, modifier = Modifier.weight(0.4f))
-                            TextField(
-                                value = passenger.identityNumber,
-                                onValueChange = { passenger = passenger.copy(identityNumber = it) },
-                                placeholder = { Text("Please enter your ${passenger.identityType.displayName.lowercase()}", color = SwiftGrayLight, fontSize = 14.sp) },
-                                modifier = Modifier.weight(0.6f),
-                                colors = TextFieldDefaults.colors(
-                                    unfocusedContainerColor = SwiftWhite,
-                                    focusedContainerColor = SwiftWhite,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent
-                                ),
-                                textStyle = androidx.compose.ui.text.TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.End, color = SwiftGray),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = if (passenger.identityType == IdentityType.ID_CARD) KeyboardType.Number else KeyboardType.Ascii)
-                            )
-                        }
-                        HorizontalDivider(color = SwiftGrayLight)
-
-                        // Name Input
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Name", color = SwiftBlack, modifier = Modifier.weight(0.4f))
-                            TextField(
-                                value = passenger.name,
-                                onValueChange = { passenger = passenger.copy(name = it) },
-                                placeholder = { Text("Enter your name on your ID", color = SwiftGrayLight, fontSize = 14.sp) },
-                                modifier = Modifier.weight(0.6f),
-                                colors = TextFieldDefaults.colors(
-                                    unfocusedContainerColor = SwiftWhite,
-                                    focusedContainerColor = SwiftWhite,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent
-                                ),
-                                textStyle = androidx.compose.ui.text.TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.End, color = SwiftGray),
-                                singleLine = true
-                            )
-                        }
-                        HorizontalDivider(color = SwiftGrayLight)
-
-                        ClickableRow("Expiry Date", passenger.expiryDate, false)
                     }
                 }
-            }
-
-            item {
-                SectionHeader("Contact Information")
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(0.dp),
-                    colors = CardDefaults.cardColors(containerColor = SwiftWhite)
-                ) {
-                    Column(modifier = Modifier.padding(start = 16.dp)) {
-                        // WhatsApp Input
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("WhatsApp", color = SwiftBlack, modifier = Modifier.weight(0.4f))
-                            Row(modifier = Modifier.weight(0.6f), verticalAlignment = Alignment.CenterVertically) {
-                                Surface(color = SwiftGrayLight, shape = RoundedCornerShape(4.dp)) {
-                                    Text("🇮🇩 62", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 12.sp)
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
+                item {
+                    SectionHeader("Certificate Information")
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(0.dp), colors = CardDefaults.cardColors(containerColor = SwiftWhite)) {
+                        Column(modifier = Modifier.padding(start = 16.dp)) {
+                            ClickableRow("Document Type", passenger.identityType.displayName, false) {
+                                passenger = passenger.copy(identityType = if (passenger.identityType == IdentityType.ID_CARD) IdentityType.PASSPORT else IdentityType.ID_CARD)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("ID Number", modifier = Modifier.weight(0.4f))
                                 TextField(
-                                    value = passenger.whatsapp,
-                                    onValueChange = { passenger = passenger.copy(whatsapp = it) },
-                                    placeholder = { Text("Please enter WhatsApp", color = SwiftGrayLight, fontSize = 14.sp) },
-                                    colors = TextFieldDefaults.colors(
-                                        unfocusedContainerColor = SwiftWhite,
-                                        focusedContainerColor = SwiftWhite,
-                                        unfocusedIndicatorColor = Color.Transparent,
-                                        focusedIndicatorColor = Color.Transparent
-                                    ),
-                                    textStyle = androidx.compose.ui.text.TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.End, color = SwiftGray),
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                                    value = passenger.identityNumber,
+                                    onValueChange = { passenger = passenger.copy(identityNumber = it) },
+                                    modifier = Modifier.weight(0.6f),
+                                    colors = TextFieldDefaults.colors(unfocusedContainerColor = SwiftWhite, focusedContainerColor = SwiftWhite, unfocusedIndicatorColor = Color.Transparent, focusedIndicatorColor = Color.Transparent),
+                                    textStyle = androidx.compose.ui.text.TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                                )
+                            }
+                            HorizontalDivider(color = SwiftGrayLight)
+                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Name", modifier = Modifier.weight(0.4f))
+                                TextField(
+                                    value = passenger.name,
+                                    onValueChange = { passenger = passenger.copy(name = it) },
+                                    modifier = Modifier.weight(0.6f),
+                                    colors = TextFieldDefaults.colors(unfocusedContainerColor = SwiftWhite, focusedContainerColor = SwiftWhite, unfocusedIndicatorColor = Color.Transparent, focusedIndicatorColor = Color.Transparent),
+                                    textStyle = androidx.compose.ui.text.TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.End)
                                 )
                             }
                         }
-                        HorizontalDivider(color = SwiftGrayLight)
-
-                        // E-mail Input
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("E-mail", color = SwiftBlack, modifier = Modifier.weight(0.4f))
-                            TextField(
-                                value = passenger.email,
-                                onValueChange = { passenger = passenger.copy(email = it) },
-                                placeholder = { Text("Please enter your email address", color = SwiftGrayLight, fontSize = 14.sp) },
-                                modifier = Modifier.weight(0.6f),
-                                colors = TextFieldDefaults.colors(
-                                    unfocusedContainerColor = SwiftWhite,
-                                    focusedContainerColor = SwiftWhite,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent
-                                ),
-                                textStyle = androidx.compose.ui.text.TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.End, color = SwiftGray),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                            )
-                        }
                     }
                 }
-            }
-            
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }

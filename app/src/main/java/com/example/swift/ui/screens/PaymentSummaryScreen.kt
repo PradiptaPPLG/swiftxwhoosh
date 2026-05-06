@@ -23,6 +23,7 @@ import com.example.swift.ui.theme.*
 import com.example.swift.viewmodel.AuthViewModel
 import com.example.swift.viewmodel.BookingViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,11 +31,15 @@ fun PaymentSummaryScreen(
     bookingViewModel: BookingViewModel,
     authViewModel: AuthViewModel,
     onPaymentComplete: () -> Unit,
+    onRescheduleComplete: () -> Unit,
     onBack: () -> Unit
 ) {
     val isProcessing = bookingViewModel.isProcessingBooking
     val errorMessage = bookingViewModel.bookingErrorMessage
     val bookingComplete = bookingViewModel.bookingComplete
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Mock countdown timer
     var remainingTime by remember { mutableIntStateOf(19 * 60 + 55) } // 19m 55s
@@ -47,8 +52,10 @@ fun PaymentSummaryScreen(
     val min = remainingTime / 60
     val sec = remainingTime % 60
 
-    LaunchedEffect(bookingComplete) {
-        if (bookingComplete) {
+    val isWaitingForPayment = bookingViewModel.isWaitingForPayment
+
+    LaunchedEffect(isWaitingForPayment) {
+        if (isWaitingForPayment) {
             onPaymentComplete()
         }
     }
@@ -104,7 +111,7 @@ fun PaymentSummaryScreen(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         OutlinedButton(
-                            onClick = { },
+                            onClick = onBack,
                             modifier = Modifier.weight(0.8f).height(48.dp),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiftGray),
@@ -113,26 +120,42 @@ fun PaymentSummaryScreen(
                             Text("Return", fontSize = 12.sp)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
+                        val isReschedule = bookingViewModel.isRescheduling
                         Button(
-                            onClick = { 
-                                val uid = authViewModel.userId.value ?: 0
-                                val accountEmail = authViewModel.userEmail.value ?: ""
-                                if (uid > 0) {
-                                    bookingViewModel.processFinalBooking(uid, accountEmail)
+                            onClick = {
+                                if (isReschedule) {
+                                    val scheduleId = bookingViewModel.schedules.find { 
+                                        it.departureTime.contains(bookingViewModel.selectedTime ?: "") 
+                                    }?.scheduleId?.toIntOrNull() ?: 0
+                                    
+                                    bookingViewModel.rescheduleBooking(scheduleId) { success ->
+                                        if (success) {
+                                            onRescheduleComplete()
+                                        } else {
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("Reschedule failed")
+                                            }
+                                        }
+                                    }
                                 } else {
-                                    // Manually trigger error if session is lost
-                                    bookingViewModel.bookingErrorMessage = "Session error: Please log out and log in again."
+                                    val uid = authViewModel.userId.value ?: 0
+                                    val accountEmail = authViewModel.userEmail.value ?: ""
+                                    if (uid > 0) {
+                                        bookingViewModel.processFinalBooking(uid, accountEmail)
+                                    } else {
+                                        bookingViewModel.bookingErrorMessage = "Session error: Please log out and log in again."
+                                    }
                                 }
                             },
                             modifier = Modifier.weight(1.4f).height(48.dp),
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = SwiftRed),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isReschedule) Color(0xFF1A6EDB) else SwiftRed),
                             enabled = !isProcessing
                         ) {
                             if (isProcessing) {
                                 CircularProgressIndicator(color = SwiftWhite, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
-                                Text("Pay", fontWeight = FontWeight.Bold)
+                                Text(if (isReschedule) "Confirm Reschedule" else "Pay", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -255,7 +278,7 @@ fun PaymentSummaryScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         
                         val seatStr = bookingViewModel.selectedSeats.getOrNull(index) ?: "N/A"
-                        Text("Coach ${bookingViewModel.selectedCoachId} | ${bookingViewModel.selectedCoach?.displayName} $seatStr", color = SwiftGray, fontSize = 14.sp)
+                        Text("Coach ${bookingViewModel.selectedCoachId} | ${bookingViewModel.selectedCoachClass.displayName} $seatStr", color = SwiftGray, fontSize = 14.sp)
                     }
                 }
             }

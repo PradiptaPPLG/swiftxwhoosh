@@ -271,4 +271,41 @@ object EmailSender {
         Log.d("EmailSender", "Refund email result: $result")
         result
     }
+    // ── 5. OTP / PASSWORD RESET ───────────────────────────────────────────────
+
+    suspend fun sendOtpEmail(toEmail: String, otp: String, userName: String = "User"): Boolean =
+        withContext(Dispatchers.IO) {
+            val body = """
+                <p class="greeting">Hi, <strong>$userName</strong></p>
+                <p class="headline">Password Reset Request</p>
+                <p style="font-size:14px;color:#555;margin-bottom:20px;">
+                  We received a request to reset the password for your Swift Express account.
+                  Use the OTP code below to continue. This code is valid for <strong>10 minutes</strong>.
+                </p>
+                <div style="text-align:center;margin:28px 0;">
+                  <div style="display:inline-block;background:#F8F9FB;border:2px dashed $BRAND_RED;border-radius:16px;padding:24px 40px;">
+                    <p style="margin:0;font-size:13px;color:#888;letter-spacing:1px;text-transform:uppercase;">Your OTP Code</p>
+                    <p style="margin:8px 0 0;font-size:42px;font-weight:900;letter-spacing:12px;color:$BRAND_RED;font-family:monospace;">$otp</p>
+                  </div>
+                </div>
+                <div class="detail-box" style="background:#FFF8E8;border-left:4px solid #E8A020;">
+                  <p style="margin:0;font-size:13px;color:#9A6A00;">
+                    ⚠️ <strong>Do not share this code with anyone.</strong> Swift Express will never ask for your OTP.
+                    If you did not request this, please ignore this email — your account remains secure.
+                  </p>
+                </div>
+                <p style="font-size:13px;color:#888;margin-top:16px;">
+                  This OTP will expire in <strong>10 minutes</strong>.
+                </p>
+            """.trimIndent()
+
+            Log.d("EmailSender", "Sending OTP email to: $toEmail")
+            val result = sendHtml(
+                to = toEmail,
+                subject = "[$otp] Swift Express — Password Reset OTP",
+                html = emailWrapper(BRAND_RED, "🔐", "Swift Express", "Password Reset", body)
+            )
+            Log.d("EmailSender", "OTP email result: $result")
+            result
+        }
 }

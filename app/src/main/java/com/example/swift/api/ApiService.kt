@@ -63,9 +63,22 @@ interface ApiService {
     @POST("lock_seat.php")
     fun lockSeat(@Body lockRequest: Map<String, Any>): Call<Map<String, Any>>
 
-    @POST("reschedule_booking.php")
-    fun rescheduleBooking(@Body request: Map<String, String>): Call<Map<String, Any>>
-
     @GET("get_user_bookings.php")
     fun getUserBookings(@Query("user_id") userId: Int): Call<UserBookingsResponse>
+
+    @POST("confirm_payment.php")
+    suspend fun confirmPayment(@Body body: Map<String, Int>): Map<String, Any>
+
+    @POST("refund_booking.php")
+    suspend fun refundBooking(@Body body: Map<String, Int>): Map<String, Any>
+
+    @POST("reschedule_booking.php")
+    suspend fun rescheduleBooking(@Body request: Map<String, Any>): Map<String, Any>
+
+    @FormUrlEncoded
+    @POST("reset_password.php")
+    fun resetPassword(
+        @Field("email") email: String,
+        @Field("new_password") newPassword: String
+    ): Call<Map<String, Any>>
 }

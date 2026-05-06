@@ -16,6 +16,7 @@ enum class CoachClass(val displayName: String) {
 }
 
 data class BookingData(
+    val bookingId: Int = 0,
     val bookingCode: String = "",
     val passengerName: String = "",
     val passengerEmail: String = "",

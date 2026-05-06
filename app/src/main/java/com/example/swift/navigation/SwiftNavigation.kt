@@ -41,6 +41,7 @@ sealed class Screen(val route: String) {
     data object RefundPolicy : Screen("refund_policy")
     data object ScheduleInfo : Screen("schedule_info")
     data object Announcement : Screen("announcement")
+    data object ForgotPassword : Screen("forgot_password")
 }
 
 sealed class BottomTab(val route: String, val label: String) {
@@ -111,6 +112,9 @@ fun SwiftNavigation() {
                 },
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
+                },
+                onForgotPassword = {
+                    navController.navigate(Screen.ForgotPassword.route)
                 }
             )
         }
@@ -143,8 +147,14 @@ fun SwiftNavigation() {
                 onAnnouncementClick = {
                     navController.navigate(Screen.Announcement.route)
                 },
+                onAddPassengerClick = {
+                    navController.navigate(Screen.AddPassenger.route)
+                },
                 onTicketClick = {
                     navController.navigate(Screen.OrderDetails.route)
+                },
+                onChangePasswordClick = {
+                    navController.navigate(Screen.ForgotPassword.route)
                 },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
@@ -217,6 +227,11 @@ fun SwiftNavigation() {
                 onPaymentComplete = {
                     navController.navigate(Screen.PaymentGateway.route)
                 },
+                onRescheduleComplete = {
+                    navController.navigate(Screen.Main.route) {
+                        popUpTo(Screen.Main.route)
+                    }
+                },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -285,6 +300,18 @@ fun SwiftNavigation() {
                 onBack = { navController.popBackStack() }
             )
         }
+
+        composable(Screen.ForgotPassword.route) {
+            ForgotPasswordScreen(
+                authViewModel = authViewModel,
+                onBack = { navController.popBackStack() },
+                onSuccess = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -296,7 +323,9 @@ fun MainScreenWithBottomNav(
     onRefundPolicyClick: () -> Unit,
     onScheduleInfoClick: () -> Unit,
     onAnnouncementClick: () -> Unit,
+    onAddPassengerClick: () -> Unit,
     onTicketClick: () -> Unit,
+    onChangePasswordClick: () -> Unit,
     onLogout: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -356,10 +385,11 @@ fun MainScreenWithBottomNav(
                     onTicketClick = { booking ->
                         // Store the selected booking in VM or pass as arg
                         bookingViewModel.currentBooking = com.example.swift.models.BookingData(
+                            bookingId = booking.bookingId,
                             bookingCode = booking.bookingCode,
                             passengerName = booking.passengerNames,
-                            origin = com.example.swift.models.Station.values().find { it.displayName == booking.originStation } ?: com.example.swift.models.Station.HALIM,
-                            destination = com.example.swift.models.Station.values().find { it.displayName == booking.destinationStation } ?: com.example.swift.models.Station.TEGALLUAR,
+                            origin = com.example.swift.models.Station.entries.find { it.displayName == booking.originStation } ?: com.example.swift.models.Station.HALIM,
+                            destination = com.example.swift.models.Station.entries.find { it.displayName == booking.destinationStation } ?: com.example.swift.models.Station.TEGALLUAR,
                             totalPrice = booking.totalPrice,
                             departureDate = booking.departureTime.split(" ")[0],
                             departureTime = booking.departureTime.split(" ")[1],
@@ -370,11 +400,19 @@ fun MainScreenWithBottomNav(
                 )
                 2 -> AccountScreen(
                     authViewModel = authViewModel,
-                    onLogout = onLogout
+                    onLogout = onLogout,
+                    onNavigate = { route ->
+                        when (route) {
+                            "AddPassenger"   -> onAddPassengerClick()
+                            "Announcement"   -> onAnnouncementClick()
+                            "RefundPolicy"   -> onRefundPolicyClick()
+                            "ScheduleInfo"   -> onScheduleInfoClick()
+                            "ChangePassword" -> onChangePasswordClick()
+                        }
+                    }
                 )
             }
         }
     }
 }
-
 
