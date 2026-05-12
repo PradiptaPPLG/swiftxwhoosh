@@ -49,14 +49,11 @@ fun LoginScreen(
     var showAccountSelector       by remember { mutableStateOf(false) }
     var accountSelectorPreferFace by remember { mutableStateOf(false) }
 
-    var mockFaceIdEmail           by remember { mutableStateOf<String?>(null) }
-    var mockFingerprintEmail      by remember { mutableStateOf<String?>(null) }
-
     val authState      by authViewModel.authState.collectAsState()
     val biometricState by authViewModel.biometricState.collectAsState()
 
     val enrolledAccounts = remember { authViewModel.getEnrolledBiometricAccounts(context) }
-    val canUseBiometric = remember { BiometricHelper.canAuthenticate(context) && enrolledAccounts.isNotEmpty() }
+    val canUseBiometric = BiometricHelper.canAuthenticate(context)
 
     // Navigate on successful standard login
     LaunchedEffect(authState) {
@@ -257,14 +254,32 @@ fun LoginScreen(
             
             Spacer(modifier = Modifier.height(12.dp))
 
-            val onBiometricTrigger: (Boolean) -> Unit = { isFace ->
+            val onBiometricTrigger: (Boolean) -> Unit = onBiometricTrigger@{ isFace ->
                 biometricError = null
-                if (enrolledAccounts.size == 1) {
-                    if (isFace) mockFaceIdEmail = enrolledAccounts[0].first
-                    else mockFingerprintEmail = enrolledAccounts[0].first
-                } else if (enrolledAccounts.size > 1) {
+                
+                if (enrolledAccounts.isEmpty()) {
+                    biometricError = "No accounts enrolled. Please login with password first."
+                    return@onBiometricTrigger
+                }
+
+                // If multiple accounts, show selector first
+                if (enrolledAccounts.size > 1) {
                     accountSelectorPreferFace = isFace
                     showAccountSelector = true
+                } else {
+                    val targetEmail = enrolledAccounts[0].first
+                    val activity = context as? FragmentActivity
+                    if (activity != null) {
+                        BiometricHelper.showPrompt(
+                            activity = activity,
+                            title = "Swift Express",
+                            subtitle = "Sign in as $targetEmail",
+                            preferFace = isFace,
+                            onSuccess = { authViewModel.onBiometricSuccess(context, targetEmail) },
+                            onError   = { biometricError = it },
+                            onFailure = { biometricError = "Biometric authentication failed" }
+                        )
+                    }
                 }
             }
 
@@ -348,11 +363,18 @@ fun LoginScreen(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
                                     showAccountSelector = false
-                                        if (accountSelectorPreferFace) {
-                                            mockFaceIdEmail = acc.first
-                                        } else {
-                                            mockFingerprintEmail = acc.first
-                                        }
+                                    val activity = context as? FragmentActivity
+                                    if (activity != null) {
+                                        BiometricHelper.showPrompt(
+                                            activity = activity,
+                                            title = "Swift Express",
+                                            subtitle = "Sign in as ${acc.first}",
+                                            preferFace = accountSelectorPreferFace,
+                                            onSuccess = { authViewModel.onBiometricSuccess(context, acc.first) },
+                                            onError   = { biometricError = it },
+                                            onFailure = { biometricError = "Biometric authentication failed" }
+                                        )
+                                    }
                                 }
                                 .padding(vertical = 12.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -370,26 +392,5 @@ fun LoginScreen(
         )
     }
 
-    // ── Mock Biometric Prompts ────────────────────────────────────────────────
-    mockFaceIdEmail?.let { email ->
-        MockFaceIdScreen(
-            accountName = email,
-            onSuccess = {
-                mockFaceIdEmail = null
-                authViewModel.onBiometricSuccess(context, email)
-            },
-            onCancel = { mockFaceIdEmail = null }
-        )
-    }
-
-    mockFingerprintEmail?.let { email ->
-        MockFingerprintDialog(
-            accountName = email,
-            onSuccess = {
-                mockFingerprintEmail = null
-                authViewModel.onBiometricSuccess(context, email)
-            },
-            onCancel = { mockFingerprintEmail = null }
-        )
-    }
+    // Biometric prompt logic is now handled via BiometricHelper and the system UI
 }

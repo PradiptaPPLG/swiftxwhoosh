@@ -170,11 +170,9 @@ fun AccountScreen(
 
             // Biometric Toggle
             val context = androidx.compose.ui.platform.LocalContext.current
-            val userEmail = authViewModel.userEmail.collectAsState().value
             var isBiometricEnrolled by remember { mutableStateOf(authViewModel.isBiometricEnrolled(context)) }
-            val canUseBiometric = remember { com.example.swift.utils.BiometricHelper.canAuthenticate(context) }
-            
-            var showEnrollPrompt by remember { mutableStateOf(false) }
+            // Force true so it's always visible for the user to see and toggle
+            val canUseBiometric = true
 
             Row(
                 modifier = Modifier
@@ -195,27 +193,27 @@ fun AccountScreen(
                     checked = isBiometricEnrolled,
                     onCheckedChange = { enable ->
                         if (enable && canUseBiometric) {
-                            showEnrollPrompt = true
+                            val activity = context as? androidx.fragment.app.FragmentActivity
+                            if (activity != null) {
+                                com.example.swift.utils.BiometricHelper.showPrompt(
+                                    activity = activity,
+                                    title = "Enable Biometric Login",
+                                    subtitle = "Verify your identity to link this account",
+                                    preferFace = false,
+                                    onSuccess = {
+                                        authViewModel.setBiometricEnrolled(context, true)
+                                        isBiometricEnrolled = true
+                                    },
+                                    onError = { /* Handle error / show toast */ },
+                                    onFailure = { /* Handle fail */ }
+                                )
+                            }
                         } else if (!enable) {
                             authViewModel.setBiometricEnrolled(context, false)
                             isBiometricEnrolled = false
                         }
                     },
                     colors = SwitchDefaults.colors(checkedThumbColor = SwiftWhite, checkedTrackColor = SwiftRed)
-                )
-            }
-            
-            if (showEnrollPrompt) {
-                MockFingerprintDialog(
-                    accountName = userEmail,
-                    onSuccess = {
-                        authViewModel.setBiometricEnrolled(context, true)
-                        isBiometricEnrolled = true
-                        showEnrollPrompt = false
-                    },
-                    onCancel = {
-                        showEnrollPrompt = false
-                    }
                 )
             }
         }

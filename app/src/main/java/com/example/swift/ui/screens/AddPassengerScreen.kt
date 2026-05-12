@@ -44,10 +44,15 @@ fun AddPassengerScreen(
         }
     }
 
-    // Auto-fill email from account if empty
+    // Auto-fill form if editing or email from account
     val accountEmail by authViewModel.userEmail.collectAsState()
-    LaunchedEffect(accountEmail) {
-        if (passenger.email.isBlank() && accountEmail.isNotBlank()) {
+    val editingP = bookingViewModel.editingPassenger
+    
+    LaunchedEffect(editingP, accountEmail) {
+        if (editingP != null) {
+            passenger = editingP
+            isAddingNew = true
+        } else if (passenger.email.isBlank() && accountEmail.isNotBlank()) {
             passenger = passenger.copy(email = accountEmail)
         }
     }
@@ -57,7 +62,15 @@ fun AddPassengerScreen(
             TopAppBar(
                 title = { Text(if (isAddingNew) "Add Passenger" else "Common Passenger", fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center) },
                 navigationIcon = {
-                    IconButton(onClick = { if (isAddingNew) isAddingNew = false else onBack() }) {
+                    IconButton(onClick = { 
+                        if (isAddingNew) {
+                            isAddingNew = false
+                            bookingViewModel.editingPassenger = null
+                            passenger = PassengerDetail() // Reset
+                        } else {
+                            onBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -85,8 +98,18 @@ fun AddPassengerScreen(
                     Button(
                         onClick = {
                             if (isFormValid) {
-                                bookingViewModel.addPassenger(passenger)
-                                isAddingNew = false
+                                if (editingP != null) {
+                                    bookingViewModel.updateSavedPassenger(passenger) { success ->
+                                        if (success) {
+                                            bookingViewModel.fetchSavedPassengers(userId ?: 0)
+                                            bookingViewModel.editingPassenger = null
+                                            isAddingNew = false
+                                        }
+                                    }
+                                } else {
+                                    bookingViewModel.addPassenger(passenger)
+                                    isAddingNew = false
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth().padding(16.dp).height(54.dp),

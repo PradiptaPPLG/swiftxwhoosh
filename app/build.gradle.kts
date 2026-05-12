@@ -72,6 +72,7 @@ dependencies {
 
     // Biometric
     implementation(libs.biometric)
+    implementation(libs.androidx.fragment.ktx)
 
     // CameraX for Mock Face ID Bypass
     implementation(libs.androidx.camera.core)

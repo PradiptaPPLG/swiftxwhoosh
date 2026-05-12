@@ -315,14 +315,14 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 ServiceInfoItem(
-                    icon = Icons.Default.Schedule,
+                    imageRes = R.drawable.jadwalwhooshkafeeder, 
                     title = "Jadwal Swift & KA Feeder",
                     desc = "Jadwal perjalanan Kereta Cepat Swift dan Integrasinya",
                     onClick = onScheduleInfoClick
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 ServiceInfoItem(
-                    icon = Icons.Default.CurrencyExchange,
+                    imageRes = R.drawable.refund_icon,
                     title = "Pengembalian Dana / Perubahan Jadwal",
                     desc = "Pengembalian Dana / Perubahan Jadwal",
                     onClick = onRefundPolicyClick
@@ -411,7 +411,7 @@ private fun StationSelector(
 
 @Composable
 private fun ServiceInfoItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    imageRes: Int,
     title: String,
     desc: String,
     onClick: (() -> Unit)? = null
@@ -427,16 +427,22 @@ private fun ServiceInfoItem(
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .background(SwiftRed.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                .size(width = 100.dp, height = 70.dp)
+                .clip(RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = SwiftRed, modifier = Modifier.size(24.dp))
+            Image(
+                painter = painterResource(id = imageRes),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = SwiftBlack)
-            Text(desc, style = MaterialTheme.typography.bodySmall, color = SwiftGray)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(desc, style = MaterialTheme.typography.bodySmall, color = SwiftGray, lineHeight = 16.sp)
         }
     }
 }

@@ -61,6 +61,9 @@ fun ScheduleScreen(
                 }
                 
                 // Date Navigation
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var showDatePicker by remember { mutableStateOf(false) }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -69,15 +72,21 @@ fun ScheduleScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { }) {
-                        Icon(Icons.Default.ArrowBackIos, contentDescription = null, tint = SwiftGray, modifier = Modifier.size(14.dp))
-                        Text("Previous", color = SwiftGray, fontSize = 14.sp)
+                    Row(
+                        modifier = Modifier.clickable { 
+                            bookingViewModel.changeDateByDays(-1)
+                            bookingViewModel.fetchSchedules()
+                        },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.ArrowBackIos, contentDescription = null, tint = SwiftRed, modifier = Modifier.size(14.dp))
+                        Text("Previous", color = SwiftRed, fontSize = 14.sp)
                     }
                     
                     Surface(
                         color = SwiftGrayLight.copy(alpha = 0.3f),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.clickable { }
+                        modifier = Modifier.clickable { showDatePicker = true }
                     ) {
                         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(bookingViewModel.departureDate, color = SwiftBlack, fontSize = 14.sp, fontWeight = FontWeight.Medium)
@@ -85,9 +94,38 @@ fun ScheduleScreen(
                         }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { }) {
-                        Text("Next", color = SwiftGray, fontSize = 14.sp)
-                        Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = SwiftGray, modifier = Modifier.size(14.dp))
+                    if (showDatePicker) {
+                        val datePickerState = rememberDatePickerState(
+                            initialSelectedDateMillis = bookingViewModel.departureDateMillis ?: System.currentTimeMillis()
+                        )
+                        DatePickerDialog(
+                            onDismissRequest = { showDatePicker = false },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    datePickerState.selectedDateMillis?.let { 
+                                        bookingViewModel.setDate(it)
+                                        bookingViewModel.fetchSchedules()
+                                    }
+                                    showDatePicker = false
+                                }) { Text("OK", color = SwiftRed) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDatePicker = false }) { Text("Cancel", color = SwiftGray) }
+                            }
+                        ) {
+                            DatePicker(state = datePickerState, colors = DatePickerDefaults.colors(selectedDayContainerColor = SwiftRed))
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.clickable { 
+                            bookingViewModel.changeDateByDays(1)
+                            bookingViewModel.fetchSchedules()
+                        },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Next", color = SwiftRed, fontSize = 14.sp)
+                        Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = SwiftRed, modifier = Modifier.size(14.dp))
                     }
                 }
             }
@@ -104,25 +142,36 @@ fun ScheduleScreen(
                     CircularProgressIndicator(color = SwiftRed)
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 16.dp)
-                ) {
-                    items(bookingViewModel.schedules) { schedule ->
-                        ScheduleItem(
-                            schedule = schedule,
-                            isExpanded = expandedScheduleId == schedule.scheduleId.toInt(),
-                            onExpandToggle = {
-                                expandedScheduleId = if (expandedScheduleId == schedule.scheduleId.toInt()) null else schedule.scheduleId.toInt()
-                            },
-                            onBook = { coachClass ->
-                                bookingViewModel.selectedTime = schedule.departureTime.substring(0, 5)
-                                bookingViewModel.selectedArrivalTime = schedule.arrivalTime.substring(0, 5)
-                                bookingViewModel.selectedCoachClass = coachClass
-                                onTimeSelected()
-                            },
-                            bookingViewModel = bookingViewModel
-                        )
+                if (bookingViewModel.schedules.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.EventBusy, contentDescription = null, tint = SwiftGrayLight, modifier = Modifier.size(64.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("No schedules available", color = SwiftGray, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Try selecting a different date or route", color = SwiftGrayLight, fontSize = 14.sp)
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        items(bookingViewModel.schedules) { schedule ->
+                            ScheduleItem(
+                                schedule = schedule,
+                                isExpanded = expandedScheduleId == schedule.scheduleId.toInt(),
+                                onExpandToggle = {
+                                    expandedScheduleId = if (expandedScheduleId == schedule.scheduleId.toInt()) null else schedule.scheduleId.toInt()
+                                },
+                                onBook = { coachClass ->
+                                    bookingViewModel.selectedTime = schedule.departureTime.substring(0, 5)
+                                    bookingViewModel.selectedArrivalTime = schedule.arrivalTime.substring(0, 5)
+                                    bookingViewModel.selectedCoachClass = coachClass
+                                    onTimeSelected()
+                                },
+                                bookingViewModel = bookingViewModel
+                            )
+                        }
                     }
                 }
             }

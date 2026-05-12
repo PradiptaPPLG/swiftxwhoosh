@@ -60,6 +60,7 @@ class BookingViewModel : ViewModel() {
     // User Bookings
     var userBookings by mutableStateOf<List<UserBooking>>(emptyList())
     var isLoadingUserBookings by mutableStateOf(false)
+    var editingPassenger by mutableStateOf<PassengerDetail?>(null)
 
     // Computed Properties
     val ticketCount: Int get() = passengers.size
@@ -83,15 +84,19 @@ class BookingViewModel : ViewModel() {
 
     fun fetchSchedules() {
         isLoadingSchedules = true
-        apiService.getSchedules(origin.name, destination.name).enqueue(object : retrofit2.Callback<List<com.example.swift.api.TrainSchedule>> {
+        apiService.getSchedules(origin.displayName, destination.displayName, departureDate).enqueue(object : retrofit2.Callback<List<com.example.swift.api.TrainSchedule>> {
             override fun onResponse(call: Call<List<com.example.swift.api.TrainSchedule>>, response: retrofit2.Response<List<com.example.swift.api.TrainSchedule>>) {
                 isLoadingSchedules = false
                 if (response.isSuccessful) {
                     schedules = response.body() ?: emptyList()
+                } else {
+                    schedules = emptyList() // Clear on failure to show empty state
                 }
             }
+
             override fun onFailure(call: Call<List<com.example.swift.api.TrainSchedule>>, t: Throwable) {
                 isLoadingSchedules = false
+                schedules = emptyList() // Clear on network failure
             }
         })
     }
@@ -108,6 +113,14 @@ class BookingViewModel : ViewModel() {
         departureDate = sdf.format(java.util.Date(millis))
     }
 
+    fun changeDateByDays(days: Int) {
+        val currentMillis = departureDateMillis ?: System.currentTimeMillis()
+        val calendar = java.util.Calendar.getInstance()
+        calendar.timeInMillis = currentMillis
+        calendar.add(java.util.Calendar.DAY_OF_YEAR, days)
+        setDate(calendar.timeInMillis)
+    }
+
     fun prepareSeatingAndFetch(scheduleId: Int) {
         isLoadingSeats = true
         viewModelScope.launch {
@@ -120,11 +133,32 @@ class BookingViewModel : ViewModel() {
                 
                 delay(800)
                 val newCoaches = mutableListOf<Coach>()
-                for (i in 1..8) {
+                
+                // Define which coaches belong to which class
+                val coachRange = when(selectedCoachClass) {
+                    CoachClass.FIRST -> 1..1
+                    CoachClass.BUSINESS -> 2..2
+                    CoachClass.PREMIUM_ECONOMY -> 3..8
+                }
+
+                // Ensure selectedCoachId is valid for the selected class
+                if (!coachRange.contains(selectedCoachId.toIntOrNull() ?: 0)) {
+                    selectedCoachId = String.format("%02d", coachRange.first)
+                }
+
+                for (i in coachRange) {
                     val coachNum = String.format("%02d", i)
                     val seats = mutableListOf<Seat>()
-                    for (row in 1..13) {
-                        for (col in listOf("A", "B", "C", "D", "F")) {
+                    
+                    // Layout configuration per class
+                    val (rowCount, columns) = when(selectedCoachClass) {
+                        CoachClass.FIRST -> 7 to listOf("A", "C", "F") // 2-1 Layout
+                        CoachClass.BUSINESS -> 10 to listOf("A", "C", "D", "F") // 2-2 Layout
+                        CoachClass.PREMIUM_ECONOMY -> 15 to listOf("A", "B", "C", "D", "F") // 3-2 Layout
+                    }
+
+                    for (row in 1..rowCount) {
+                        for (col in columns) {
                             val seatId = "$row$col"
                             val isAvailable = !occupied.contains(seatId)
                             seats.add(Seat(seatId, isAvailable))
@@ -224,6 +258,7 @@ class BookingViewModel : ViewModel() {
                     "coach_id" to selectedCoachId,
                     "seats" to selectedSeats.toList(),
                     "passenger_names" to passengers.map { it.name },
+                    "seat_class" to selectedCoachClass.name,
                     "total_price" to totalPrice
                 )
                 
@@ -357,6 +392,7 @@ class BookingViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     savedPassengers = response.body()?.passengers?.map { dto ->
                         PassengerDetail(
+                            id = dto.id,
                             name = dto.name,
                             gender = if (dto.gender == "Male") Gender.MALE else Gender.FEMALE,
                             identityType = if (dto.identityType == "Passport") IdentityType.PASSPORT else IdentityType.ID_CARD,
@@ -383,6 +419,28 @@ class BookingViewModel : ViewModel() {
                 Log.e("BookingViewModel", "Error sending email: ${e.message}")
             }
         }
+    }
+
+    fun updateSavedPassenger(passenger: PassengerDetail, onComplete: (Boolean) -> Unit) {
+        val body = mapOf(
+            "id" to passenger.id,
+            "name" to passenger.name,
+            "identity_type" to passenger.identityType.displayName,
+            "identity_number" to passenger.identityNumber,
+            "gender" to passenger.gender.displayName
+        )
+        apiService.updateSavedPassenger(body).enqueue(object : retrofit2.Callback<Map<String, Any>> {
+            override fun onResponse(call: Call<Map<String, Any>>, response: retrofit2.Response<Map<String, Any>>) {
+                if (response.isSuccessful && response.body()?.get("status") == "success") {
+                    onComplete(true)
+                } else {
+                    onComplete(false)
+                }
+            }
+            override fun onFailure(call: Call<Map<String, Any>>, t: Throwable) {
+                onComplete(false)
+            }
+        })
     }
 
     fun startPaymentTimer() {

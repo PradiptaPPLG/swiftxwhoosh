@@ -120,6 +120,7 @@ enum class Gender(val displayName: String) {
 }
 
 data class PassengerDetail(
+    val id: Int = 0,
     val name: String = "",
     val gender: Gender = Gender.MALE,
     val dateOfBirth: String = "",
@@ -150,6 +151,7 @@ data class ScheduleDocument(
 )
 
 data class PassengerDTO(
+    val id: Int,
     val name: String,
     @SerializedName("identity_type") val identityType: String,
     @SerializedName("identity_number") val identityNumber: String,
@@ -186,6 +188,7 @@ data class UserBooking(
     @SerializedName("departure_time") val departureTime: String, // Format: YYYY-MM-DD HH:mm:ss
     @SerializedName("train_number") val trainNumber: String,
     @SerializedName("passenger_names") val passengerNames: String,
+    @SerializedName("seat_class") val seatClass: String = "PREMIUM_ECONOMY",
     @SerializedName("ticket_count") val ticketCount: Int
 ) {
     // Logika 2 Jam: Wajib dilakukan minimal 2 jam sebelum keberangkatan

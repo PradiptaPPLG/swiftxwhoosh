@@ -215,7 +215,10 @@ fun PassengerDetailsScreen(
                                 passenger = passenger,
                                 isSelected = currentSelected.any { it.identityNumber == passenger.identityNumber },
                                 onToggle = { bookingViewModel.togglePassengerSelection(passenger, userId) },
-                                onEdit = { /* Not implemented yet */ }
+                                onEdit = { 
+                                    bookingViewModel.editingPassenger = passenger
+                                    onAddPassengerClicked()
+                                }
                             )
                         }
                         

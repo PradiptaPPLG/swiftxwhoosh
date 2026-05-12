@@ -29,7 +29,8 @@ interface ApiService {
     @retrofit2.http.GET("get_schedules.php")
     fun getSchedules(
         @retrofit2.http.Query("origin") origin: String,
-        @retrofit2.http.Query("destination") destination: String
+        @retrofit2.http.Query("destination") destination: String,
+        @retrofit2.http.Query("date") date: String
     ): Call<List<TrainSchedule>>
 
     @retrofit2.http.POST("create_booking.php")
@@ -81,4 +82,6 @@ interface ApiService {
         @Field("email") email: String,
         @Field("new_password") newPassword: String
     ): Call<Map<String, Any>>
+    @POST("update_saved_passenger.php")
+    fun updateSavedPassenger(@Body body: Map<String, Any>): Call<Map<String, Any>>
 }

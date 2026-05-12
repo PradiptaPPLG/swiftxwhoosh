@@ -186,7 +186,9 @@ fun SeatSelectionScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         currentCoach?.let { coach ->
-                            for (row in 1..13) {
+                            val maxRow = coach.seats.map { it.id.filter { c -> c.isDigit() }.toInt() }.maxOrNull() ?: 1
+                            
+                            for (row in 1..maxRow) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -198,35 +200,44 @@ fun SeatSelectionScreen(
                                     listOf("A", "B", "C").forEach { letter ->
                                         val seatId = "$row$letter"
                                         val seat = coach.seats.find { it.id == seatId }
-                                        SeatIcon(
-                                            seatId = seatId,
-                                            isAvailable = seat?.isAvailable == true,
-                                            isSelected = bookingViewModel.selectedSeats.contains(seatId),
-                                            onClick = { 
-                                                val sId = bookingViewModel.schedules.find { it.departureTime.startsWith(bookingViewModel.selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
-                                                bookingViewModel.toggleSeatSelection(seatId, sId) 
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        if (seat != null) {
+                                            SeatIcon(
+                                                seatId = seatId,
+                                                isAvailable = seat.isAvailable,
+                                                isSelected = bookingViewModel.selectedSeats.contains(seatId),
+                                                onClick = { 
+                                                    val sId = bookingViewModel.schedules.find { it.departureTime.startsWith(bookingViewModel.selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
+                                                    bookingViewModel.toggleSeatSelection(seatId, sId) 
+                                                }
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                        } else if (bookingViewModel.selectedCoachClass == com.example.swift.models.CoachClass.FIRST && letter == "B") {
+                                            // Optional: Hidden placeholder to maintain spacing if needed, but 2-1 is usually offset
+                                            Spacer(modifier = Modifier.width(42.dp).padding(horizontal = 3.dp))
+                                        }
                                     }
 
                                     // Aisle
-                                    Text("AISLE", color = SwiftGrayLight, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp))
+                                    Box(modifier = Modifier.width(40.dp), contentAlignment = Alignment.Center) {
+                                        Text("AISLE", color = SwiftGrayLight, fontSize = 8.sp)
+                                    }
 
                                     // Right Side (D, F)
                                     listOf("D", "F").forEach { letter ->
                                         val seatId = "$row$letter"
                                         val seat = coach.seats.find { it.id == seatId }
-                                        SeatIcon(
-                                            seatId = seatId,
-                                            isAvailable = seat?.isAvailable == true,
-                                            isSelected = bookingViewModel.selectedSeats.contains(seatId),
-                                            onClick = { 
-                                                val sId = bookingViewModel.schedules.find { it.departureTime.startsWith(bookingViewModel.selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
-                                                bookingViewModel.toggleSeatSelection(seatId, sId) 
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        if (seat != null) {
+                                            SeatIcon(
+                                                seatId = seatId,
+                                                isAvailable = seat.isAvailable,
+                                                isSelected = bookingViewModel.selectedSeats.contains(seatId),
+                                                onClick = { 
+                                                    val sId = bookingViewModel.schedules.find { it.departureTime.startsWith(bookingViewModel.selectedTime ?: "") }?.scheduleId?.toInt() ?: 0
+                                                    bookingViewModel.toggleSeatSelection(seatId, sId) 
+                                                }
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                        }
                                     }
                                 }
                             }

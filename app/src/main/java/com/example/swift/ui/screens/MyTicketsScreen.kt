@@ -117,11 +117,10 @@ fun MyTicketsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = com.example.swift.R.drawable.logo),
+                    Image(
+                        painter = painterResource(id = com.example.swift.R.drawable.nodata),
                         contentDescription = null,
-                        modifier = Modifier.size(100.dp).alpha(0.1f),
-                        tint = SwiftBlack
+                        modifier = Modifier.size(140.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("No tickets in ${tabs[selectedTabIndex]}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = SwiftGrayMedium)
