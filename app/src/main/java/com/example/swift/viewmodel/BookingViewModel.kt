@@ -57,10 +57,13 @@ class BookingViewModel : ViewModel() {
     var savedPassengers by mutableStateOf<List<PassengerDetail>>(emptyList())
     var isLoadingSavedPassengers by mutableStateOf(false)
 
-    // User Bookings
     var userBookings by mutableStateOf<List<UserBooking>>(emptyList())
     var isLoadingUserBookings by mutableStateOf(false)
     var editingPassenger by mutableStateOf<PassengerDetail?>(null)
+
+    // Carousels
+    var carousels by mutableStateOf<List<CarouselImage>>(emptyList())
+    var isLoadingCarousels by mutableStateOf(false)
 
     // Computed Properties
     val ticketCount: Int get() = passengers.size
@@ -81,6 +84,10 @@ class BookingViewModel : ViewModel() {
     // Real API State
     var schedules by mutableStateOf<List<com.example.swift.api.TrainSchedule>>(emptyList())
     var isLoadingSchedules by mutableStateOf(false)
+
+    init {
+        fetchCarousels()
+    }
 
     fun fetchSchedules() {
         isLoadingSchedules = true
@@ -439,6 +446,22 @@ class BookingViewModel : ViewModel() {
             }
             override fun onFailure(call: Call<Map<String, Any>>, t: Throwable) {
                 onComplete(false)
+            }
+        })
+    }
+
+    fun fetchCarousels() {
+        isLoadingCarousels = true
+        apiService.getCarousels().enqueue(object : retrofit2.Callback<List<CarouselImage>> {
+            override fun onResponse(call: Call<List<CarouselImage>>, response: retrofit2.Response<List<CarouselImage>>) {
+                isLoadingCarousels = false
+                if (response.isSuccessful) {
+                    carousels = response.body() ?: emptyList()
+                }
+            }
+
+            override fun onFailure(call: Call<List<CarouselImage>>, t: Throwable) {
+                isLoadingCarousels = false
             }
         })
     }

@@ -48,6 +48,8 @@ fun LoginScreen(
     var biometricError            by remember { mutableStateOf<String?>(null) }
     var showAccountSelector       by remember { mutableStateOf(false) }
     var accountSelectorPreferFace by remember { mutableStateOf(false) }
+    var showMockFaceId by remember { mutableStateOf(false) }
+    var targetBiometricEmail by remember { mutableStateOf("") }
 
     val authState      by authViewModel.authState.collectAsState()
     val biometricState by authViewModel.biometricState.collectAsState()
@@ -268,17 +270,23 @@ fun LoginScreen(
                     showAccountSelector = true
                 } else {
                     val targetEmail = enrolledAccounts[0].first
-                    val activity = context as? FragmentActivity
-                    if (activity != null) {
-                        BiometricHelper.showPrompt(
-                            activity = activity,
-                            title = "Swift Express",
-                            subtitle = "Sign in as $targetEmail",
-                            preferFace = isFace,
-                            onSuccess = { authViewModel.onBiometricSuccess(context, targetEmail) },
-                            onError   = { biometricError = it },
-                            onFailure = { biometricError = "Biometric authentication failed" }
-                        )
+                    targetBiometricEmail = targetEmail
+                    
+                    if (isFace) {
+                        showMockFaceId = true
+                    } else {
+                        val activity = context as? FragmentActivity
+                        if (activity != null) {
+                            BiometricHelper.showPrompt(
+                                activity = activity,
+                                title = "Swift Express",
+                                subtitle = "Sign in as $targetEmail",
+                                preferFace = false, // Always false for system fingerprint
+                                onSuccess = { authViewModel.onBiometricSuccess(context, targetEmail) },
+                                onError   = { biometricError = it },
+                                onFailure = { biometricError = "Biometric authentication failed" }
+                            )
+                        }
                     }
                 }
             }
@@ -363,17 +371,24 @@ fun LoginScreen(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
                                     showAccountSelector = false
-                                    val activity = context as? FragmentActivity
-                                    if (activity != null) {
-                                        BiometricHelper.showPrompt(
-                                            activity = activity,
-                                            title = "Swift Express",
-                                            subtitle = "Sign in as ${acc.first}",
-                                            preferFace = accountSelectorPreferFace,
-                                            onSuccess = { authViewModel.onBiometricSuccess(context, acc.first) },
-                                            onError   = { biometricError = it },
-                                            onFailure = { biometricError = "Biometric authentication failed" }
-                                        )
+                                    val targetEmail = acc.first
+                                    targetBiometricEmail = targetEmail
+                                    
+                                    if (accountSelectorPreferFace) {
+                                        showMockFaceId = true
+                                    } else {
+                                        val activity = context as? FragmentActivity
+                                        if (activity != null) {
+                                            BiometricHelper.showPrompt(
+                                                activity = activity,
+                                                title = "Swift Express",
+                                                subtitle = "Sign in as $targetEmail",
+                                                preferFace = false,
+                                                onSuccess = { authViewModel.onBiometricSuccess(context, targetEmail) },
+                                                onError   = { biometricError = it },
+                                                onFailure = { biometricError = "Biometric authentication failed" }
+                                            )
+                                        }
                                     }
                                 }
                                 .padding(vertical = 12.dp, horizontal = 8.dp),
@@ -392,5 +407,17 @@ fun LoginScreen(
         )
     }
 
-    // Biometric prompt logic is now handled via BiometricHelper and the system UI
+    // ── Mock Face ID Screen ──────────────────────────────────────────────────
+    if (showMockFaceId) {
+        MockFaceIdScreen(
+            accountName = targetBiometricEmail,
+            onSuccess = {
+                showMockFaceId = false
+                authViewModel.onBiometricSuccess(context, targetBiometricEmail)
+            },
+            onCancel = { showMockFaceId = false }
+        )
+    }
+
+    // Biometric prompt logic for fingerprint is handled via BiometricHelper
 }

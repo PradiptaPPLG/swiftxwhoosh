@@ -84,4 +84,7 @@ interface ApiService {
     ): Call<Map<String, Any>>
     @POST("update_saved_passenger.php")
     fun updateSavedPassenger(@Body body: Map<String, Any>): Call<Map<String, Any>>
+
+    @GET("get_carousels.php")
+    fun getCarousels(): Call<List<CarouselImage>>
 }

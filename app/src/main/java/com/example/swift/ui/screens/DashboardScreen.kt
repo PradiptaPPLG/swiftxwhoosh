@@ -35,6 +35,10 @@ import com.example.swift.models.Station
 import com.example.swift.ui.theme.*
 import kotlinx.coroutines.delay
 import com.example.swift.viewmodel.BookingViewModel
+import coil.compose.AsyncImage
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.rotate
+import androidx.compose.animation.core.animateFloatAsState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -49,6 +53,11 @@ fun DashboardScreen(
     var originExpanded by remember { mutableStateOf(false) }
     var destinationExpanded by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var rotationAngle by remember { mutableFloatStateOf(0f) }
+    val animatedRotation by animateFloatAsState(
+        targetValue = rotationAngle,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+    )
 
     Column(
         modifier = Modifier
@@ -56,25 +65,31 @@ fun DashboardScreen(
             .background(SwiftPinkBg)
             .verticalScroll(rememberScrollState())
     ) {
-        // Image Carousel Banner
-        val images = listOf(
+        // Dynamic Image Carousel
+        val carousels = bookingViewModel.carousels
+        val fallbackImages = listOf(
             R.drawable.swift_action,
             R.drawable.swift_cara_pesan,
             R.drawable.swift_discount,
             R.drawable.swift_potongan45,
             R.drawable.swift_tiket_promo
         )
+        val hasData = carousels.isNotEmpty()
+        val displayCount = if (hasData) carousels.size else fallbackImages.size
+
         val startIndex = Int.MAX_VALUE / 2
-        val initialPage = startIndex - (startIndex % images.size)
+        val initialPage = startIndex - (startIndex % displayCount)
         val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { Int.MAX_VALUE })
         
-        LaunchedEffect(pagerState.settledPage) {
-            delay(3500)
-            val nextPage = pagerState.settledPage + 1
-            pagerState.animateScrollToPage(
-                page = nextPage,
-                animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
-            )
+        LaunchedEffect(pagerState.settledPage, displayCount) {
+            if (displayCount > 0) {
+                delay(3500)
+                val nextPage = pagerState.settledPage + 1
+                pagerState.animateScrollToPage(
+                    page = nextPage,
+                    animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
+                )
+            }
         }
 
         Box(
@@ -86,13 +101,24 @@ fun DashboardScreen(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                val actualPage = page % images.size
-                Image(
-                    painter = painterResource(id = images[actualPage]),
-                    contentDescription = "Banner ${actualPage + 1}",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                val actualPage = page % displayCount
+                if (hasData) {
+                    AsyncImage(
+                        model = carousels[actualPage].imageUrl,
+                        contentDescription = carousels[actualPage].title ?: "Banner",
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier.fillMaxSize(),
+                        placeholder = painterResource(id = fallbackImages[actualPage % fallbackImages.size]),
+                        error = painterResource(id = fallbackImages[actualPage % fallbackImages.size])
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = fallbackImages[actualPage]),
+                        contentDescription = "Banner ${actualPage + 1}",
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
             // Semi-transparent overlay for text readability
@@ -113,8 +139,8 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                repeat(images.size) { iteration ->
-                    val actualCurrentPage = pagerState.currentPage % images.size
+                repeat(displayCount) { iteration ->
+                    val actualCurrentPage = pagerState.currentPage % displayCount
                     val color = if (actualCurrentPage == iteration) SwiftWhite else SwiftWhite.copy(alpha = 0.5f)
                     Box(
                         modifier = Modifier
@@ -122,14 +148,6 @@ fun DashboardScreen(
                             .clip(CircleShape)
                             .background(color)
                             .size(if (actualCurrentPage == iteration) 8.dp else 6.dp)
-
-
-
-
-
-
-
-
                     )
                 }
             }
@@ -178,15 +196,23 @@ fun DashboardScreen(
                     // Swap Button
                     IconButton(
                         onClick = {
+                            rotationAngle += 180f
                             bookingViewModel.swapStations()
                             errorMessage = null
                         },
                         modifier = Modifier
                             .padding(horizontal = 8.dp)
-                            .size(40.dp)
+                            .size(48.dp)
                             .background(SwiftRed.copy(alpha = 0.1f), CircleShape)
                     ) {
-                        Icon(Icons.Default.SwapHoriz, contentDescription = "Swap", tint = SwiftRed)
+                        Icon(
+                            painter = painterResource(id = R.drawable.switchdestination),
+                            contentDescription = "Swap",
+                            tint = Color.Unspecified,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .rotate(animatedRotation)
+                        )
                     }
 
                     // Destination
@@ -310,7 +336,12 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Service Terms", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SwiftBlack)
-                    Text("More", style = MaterialTheme.typography.bodySmall, color = SwiftDarkTeal)
+                    Text(
+                        text = "More", 
+                        style = MaterialTheme.typography.bodySmall, 
+                        color = SwiftDarkTeal,
+                        modifier = Modifier.clickable { onAnnouncementClick() }
+                    )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -427,7 +458,7 @@ private fun ServiceInfoItem(
     ) {
         Box(
             modifier = Modifier
-                .size(width = 100.dp, height = 70.dp)
+                .size(80.dp)
                 .clip(RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {

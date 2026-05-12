@@ -216,3 +216,9 @@ data class UserBookingsResponse(
     val bookings: List<UserBooking> = emptyList(),
     val message: String? = null
 )
+
+data class CarouselImage(
+    val id: Int,
+    @SerializedName("image_url") val imageUrl: String,
+    val title: String?
+)
